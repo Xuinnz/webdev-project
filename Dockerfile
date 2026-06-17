@@ -25,6 +25,12 @@ WORKDIR /var/www
 # Copy existing application directory contents
 COPY . /var/www
 
+# Permissions
+RUN mkdir -p /var/www/storage /var/www/bootstrap/cache
+RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
+RUN chmod -R 775 /var/www/storage /var/www/bootstrap/cache
+
+
 # Expose port 9000 and start php-fpm server
 EXPOSE 9000
 CMD ["php-fpm"]
