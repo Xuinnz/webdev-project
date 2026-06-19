@@ -57,12 +57,4 @@ To stop the container
 docker compose down
 ```
 
-To execute Laravel Artisan commands during development, prefix the command to route it through application layer.
-``` bash
-docker compose exec app php artisan [command]
-
-# example 
-docker compose exec app php artisan make:controller PatientController
-```
-
 For other installations like npm, you can run just run it locally.
