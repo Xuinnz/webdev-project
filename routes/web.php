@@ -29,7 +29,7 @@ Route::group(['prefix' => 'auth'], function(){
 Route::group(['prefix' => 'appointments'], function() {
     Route::get('/{uuid}', [AppointmentController::class, 'getAppointment'])->name('appointment.get');
 
-    Route::post('/{uuid}', [AppointmentController::class, 'editAppointment'])->name('appointment.edit');
+    Route::patch('/{uuid}', [AppointmentController::class, 'editAppointment'])->name('appointment.edit');
 });
 
 //SHARED FUNCTIONS

@@ -52,10 +52,10 @@ class AppointmentController extends Controller
         try {
             //update status appointment
             DB::table('appointments')->where('id', $uuid)->update([
-                'status' => $request['status']
+                'status' => $request->status
             ]);
             return redirect()->route('appointments.show', $uuid)
-                             ->with('success', 'Appointment status updated to ' . $request['status']);
+                             ->with('success', 'Appointment status updated to ' . $request->status);
         } catch (\Exception $e) {
             return back()->withErrors(['error' => 'Failed to update appointment status.']);
         }

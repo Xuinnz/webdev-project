@@ -20,17 +20,17 @@ class AuthController extends Controller
         try {
             $userId = DB::table('users')->insertGetId([
                 'uuid' => Str::uuid(),
-                'name' => $request['name'],
-                'email' => $request['email'],
-                'password' => Hash::make($request['password']),
-                'role' => $request['role'],
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'role' => $request->role,
             ]);
             Session::put('user_id', $userId);
-            Session::put('user_role', $request['role']);
-            Session::put('user_name', $request['name']);
+            Session::put('user_role', $request->role);
+            Session::put('user_name', $request->name);
 
             //redirect to specific role's onboarding
-            return redirect()->route($request['role'] . '.onboarding.show');
+            return redirect()->route($request->role . '.onboarding.show');
 
         } catch (\Exception $e){
             return back()->withErrors(['error' => 'Registration failed. Please try again.'])->withInput();
@@ -43,9 +43,9 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $user = DB::table('users')->where('email', $request['email'])->first();
+        $user = DB::table('users')->where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request['password'], $user->password)) {
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return back()->withErrors(['email' => 'Invalid email or password.'])->withInput();
         }
 
