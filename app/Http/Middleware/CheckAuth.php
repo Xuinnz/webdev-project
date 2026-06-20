@@ -17,28 +17,27 @@ class CheckAuth
      */
     public function handle(Request $request, Closure $next, $role = null): Response
     {
-        // 1. Check if the user is logged in at all
+        // check if user is logged in
         if (!Session::has('user_id')) {
             return redirect()->route('login')->withErrors(['error' => 'Please log in to continue.']);
         }
 
-        // 2. If a specific role is required for this route, verify it
+        // if one role tried to access other rol's function
         if ($role && Session::get('user_role') !== $role) {
             
-            // If they are logged in but in the wrong place, send them to their own dashboard
             $actualRole = Session::get('user_role');
             
-            // Fallback just in case the role isn't set properly
+            // if no role, make them login again
             if (!$actualRole) {
                 Session::flush();
                 return redirect()->route('login');
             }
 
+            //redirect to their role's dashboard
             return redirect()->route($actualRole . '.dashboard')
                 ->withErrors(['error' => 'Unauthorized access.']);
         }
-
-        // 3. All checks passed, proceed to the controller
+        //valid request.
         return $next($request);
     }
 }
