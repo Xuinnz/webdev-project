@@ -24,13 +24,6 @@ Route::group(['prefix' => 'auth'], function(){
     Route::post('/logout', [AuthController::class, 'logout'])->name('auth.logout');
 });
 
-//SHARED FUNCTIONS
-Route::group(['prefix' => 'profile'], function() {
-    Route::get('/', [ProfileController::class, 'getProfile'])->name('user.get');
-    
-    Route::post('/', [ProfileController::class], 'editProfile')->name('user.edit');
-});
-
 
 //SHARED FUNCTIONS
 Route::group(['prefix' => 'appointments'], function() {
