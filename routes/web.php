@@ -53,12 +53,12 @@ Route::group(['prefix' => 'conversations'], function() {
 });
 
 //PATIENT SIDE FUNCTIONS
-Route::group(['prefix' => 'patient'], function (){
+Route::middleware(['checkauth:patient'])->prefix('patient')->name('patient.')->group(function (){
 
 });
 
 //DOCTOR SIDE FUNCTIONS
-Route::group(['prefix' => 'doctor'], function (){
+Route::middleware(['checkauth:doctor'])->prefix('doctor')->name('doctor.')->group(function (){
 
 });
 
