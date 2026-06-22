@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@yield('title', 'UNICare') — The University Hospital</title>
+    <link rel="stylesheet" href="{{ asset('css/patient.css') }}">
+    @vite(['resources/js/app.js'])
+</head>
+<body x-data="pageTransitions">
+    <div class="unicare-shell" :class="leaving ? 'animate-unicare-out' : ''">
+        <aside class="unicare-sidebar animate-unicare-in-left">
+            <div>
+                <div class="unicare-brand animate-unicare-in stagger-1">
+                    <div class="unicare-logo">
+                        <img src="Logo.png">
+                    </div>
+                    <div>
+                        <p class="unicare-brand-title">UNICare</p>
+                        <p class="unicare-brand-subtitle">The University Hospital</p>
+                    </div>
+                </div>
+
+                <nav class="unicare-nav">
+                    @php
+                        $links = [
+                            ['label' => 'Home', 'route' => 'home'],
+                            ['label' => 'Appointment', 'route' => 'appointments'],
+                            ['label' => 'Medical Record', 'route' => 'medical-records'],
+                            ['label' => 'Chat', 'route' => 'chat'],
+                        ];
+                    @endphp
+
+                    @foreach ($links as $index => $link)
+                        <a
+                            href="{{ route($link['route']) }}"
+                            @click="navigate($event, '{{ route($link['route']) }}')"
+                            @class([
+                                'unicare-nav-link animate-unicare-in',
+                                'is-active' => request()->routeIs($link['route']),
+                                'stagger-' . ($index + 2) => true,
+                            ])
+                        >
+                            {{ $link['label'] }}
+                        </a>
+                    @endforeach
+                </nav>
+            </div>
+
+            <a href="#" class="unicare-logout animate-unicare-in stagger-6">
+                <span aria-hidden="true">&#8614;</span>
+                Logout
+            </a>
+        </aside>
+
+        <main class="unicare-main animate-unicare-in-right stagger-2">
+            <div :class="leaving ? 'animate-unicare-out' : ''">
+                @yield('content')
+            </div>
+        </main>
+    </div>
+</body>
+</html>
