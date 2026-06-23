@@ -22,9 +22,17 @@ class PatientController extends Controller
                 'users.email', 
                 'users.phone', 
                 'users.gender', 
+                'users.avatar_url',
+                DB::raw('MAX(appointments.appointment_date) as last_visit')
+            )
+            ->groupBy(
+                'users.uuid',
+                'users.name',
+                'users.email',
+                'users.phone',
+                'users.gender',
                 'users.avatar_url'
             )
-            ->distinct() 
             ->orderBy('users.name', 'asc') 
             ->get();
 
@@ -115,8 +123,10 @@ class PatientController extends Controller
         $doctorId = Session::get('user_id');
 
         $record = DB::table('medical_records')
-            ->where('uuid', $uuid)
-            ->where('doctor_id', $doctorId)
+            ->join('users', 'medical_records.patient_id', '=', 'users.id')
+            ->where('medical_records.uuid', $uuid)
+            ->where('medical_records.doctor_id', $doctorId)
+            ->select('medical_records.*', 'users.uuid as patient_uuid', 'users.name as patient_name')
             ->first();
 
         if (!$record) {
@@ -232,5 +242,27 @@ class PatientController extends Controller
                              ->withErrors(['error' => 'Failed to save medical record. Please try again.'])
                              ->withInput();
         }
+    }
+
+    public function getPatientPrescriptions($uuid)
+    {
+        $doctorId = Session::get('user_id');
+
+        $patient = DB::table('users')
+            ->where('uuid', $uuid)
+            ->where('role', 'patient')
+            ->first();
+
+        if (!$patient) {
+            abort(404, 'Patient not found.');
+        }
+
+        $prescriptions = DB::table('prescriptions')
+            ->where('patient_id', $patient->id)
+            ->where('doctor_id', $doctorId)
+            ->orderBy('issued_at', 'desc')
+            ->get();
+
+        return view('doctor.patients.prescriptions', compact('prescriptions', 'patient'));
     }
 }

@@ -8,7 +8,37 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 
 class DoctorController extends Controller
-{   
+{
+    public function dashboard()
+    {
+        $userId = Session::get('user_id');
+        $doctor = DB::table('users')->where('id', $userId)->first();
+        $today = now()->toDateString();
+
+        $todayAppointments = DB::table('appointments')
+            ->join('users as patients', 'appointments.patient_id', '=', 'patients.id')
+            ->where('appointments.doctor_id', $userId)
+            ->where('appointments.appointment_date', $today)
+            ->select('appointments.*', 'patients.name as patient_name')
+            ->orderBy('appointments.start_time')
+            ->get();
+
+        $stats = [
+            'today_appointments' => $todayAppointments->count(),
+            'total_patients' => DB::table('appointments')
+                ->where('doctor_id', $userId)
+                ->distinct()
+                ->count('patient_id'),
+            'upcoming_appointments' => DB::table('appointments')
+                ->where('doctor_id', $userId)
+                ->where('appointment_date', '>=', $today)
+                ->whereIn('status', ['confirmed', 'pending'])
+                ->count(),
+        ];
+
+        return view('doctor.dashboard', compact('doctor', 'stats', 'todayAppointments'));
+    }
+
     //show onboarding view
     public function showOnBoarding(){
         $specialties = DB::table('specialties')->get();
@@ -29,7 +59,7 @@ class DoctorController extends Controller
         */
     public function processOnBoarding(Request $request){
         $userId = Session::get('user_id');
-        $request->validate([
+        $validated = $request->validate([
             // users table
             'phone' => 'required|string|max:20',
             'gender' => 'required|in:male,female,other',
@@ -51,20 +81,20 @@ class DoctorController extends Controller
 
         try {
             //transaction for all pass or all fails
-            DB::transaction(function () use ($userId, $request) {
+            DB::transaction(function () use ($userId, $validated) {
 
                 DB::table('users')->where('id', $userId)->update([
-                    'phone' => $request->phone,
-                    'gender' => $request->gender,
-                    'avatar_url' => $request->avatar_url,
+                    'phone' => $validated['phone'],
+                    'gender' => $validated['gender'],
+                    'avatar_url' => $validated['avatar_url'] ?? null,
                 ]);
 
                 $profileId = DB::table('doctor_profiles')->insertGetId([
                     'user_id' => $userId,
-                    'specialty_id' => $request->specialty_id,
-                    'license_number' => $request->license_number,
-                    'bio' => $request->bio,
-                    'consultation_fee' => $request->consultation_fee,
+                    'specialty_id' => $validated['specialty_id'],
+                    'license_number' => $validated['license_number'],
+                    'bio' => $validated['bio'] ?? null,
+                    'consultation_fee' => $validated['consultation_fee'],
                 ]);
                 //put it in an array
                 $scheduleInserts = [];
@@ -126,18 +156,21 @@ class DoctorController extends Controller
                 'doctor_profiles.license_number',
                 'doctor_profiles.bio',
                 'doctor_profiles.consultation_fee',
+                'doctor_profiles.specialty_id',
                 'specialties.name as specialty_name'
             )
             ->first();
+
+        $specialties = DB::table('specialties')->orderBy('name')->get();
         
-        return view('doctor.profile', compact('profile'));
+        return view('doctor.profile', compact('profile', 'specialties'));
     }
     
     //update session doctor profile
     public function updateProfile(Request $request)
     {
         $userId = Session::get('user_id');
-        $request->validate([
+        $validated = $request->validate([
             // users table
             'name' => 'required|string|max:255',
             'phone' => 'required|string|max:20',
@@ -153,15 +186,15 @@ class DoctorController extends Controller
         try {
             DB::transaction(function () use ($userId, $validated) {
                 DB::table('users')->where('id', $userId)->update([
-                    'name' => $request->name,
-                    'phone' => $request->phone,
-                    'gender' => $request->gender,
-                    'avatar_url' => $request->avatar_url,
+                    'name' => $validated['name'],
+                    'phone' => $validated['phone'],
+                    'gender' => $validated['gender'],
+                    'avatar_url' => $validated['avatar_url'] ?? null,
                 ]);
                 DB::table('doctor_profiles')->where('user_id', $userId)->update([
-                    'specialty_id' => $request->specialty_id,
-                    'bio' => $request->bio,
-                    'consultation_fee' => $request->consultation_fee,
+                    'specialty_id' => $validated['specialty_id'],
+                    'bio' => $validated['bio'] ?? null,
+                    'consultation_fee' => $validated['consultation_fee'],
                 ]);
             });
             return redirect()->back()->with('success', 'Your profile has been successfully updated.');
@@ -192,7 +225,7 @@ class DoctorController extends Controller
     public function editSchedule(Request $request)
     {
         $userId = Session::get('user_id');
-        $request->validate([
+        $validated = $request->validate([
             'schedules' => 'required|array|min:1',
             'schedules.*.weekday' => 'required|integer|between:0,6',
             'schedules.*.ranges' => 'required|array|min:1',
@@ -201,7 +234,7 @@ class DoctorController extends Controller
         ]);
         //instead of updating, we delete the whole table, and create a new one.
         try {
-            DB::transaction(function () use ($userId, $request) {
+            DB::transaction(function () use ($userId, $validated) {
                 DB::table('doctor_schedules')->where('doctor_id', $userId)->delete();
                 $scheduleInserts = [];
                 foreach ($validated['schedules'] as $schedule) {

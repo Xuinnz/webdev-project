@@ -23,7 +23,8 @@ class AppointmentController extends Controller
                 'patients.name as patient_name', 
                 'patients.phone as patient_phone',
                 'patients.gender as patient_gender',
-                'patients.avatar_url as patient_avatar' // Nice to have for the UI!
+                'patients.avatar_url as patient_avatar',
+                'patients.uuid as patient_uuid'
             )
             ->orderBy('appointments.appointment_date', 'asc')
             ->orderBy('appointments.start_time', 'asc')
