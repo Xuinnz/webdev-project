@@ -17,6 +17,9 @@ services:
       - ./:/var/www
     networks:
       - app-network
+    depends_on:
+      db:
+        condition: service_healthy
 
   # 2. The Nginx Web Server
   webserver:
@@ -45,10 +48,16 @@ services:
     environment:
       MYSQL_DATABASE: ${DB_DATABASE}
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_HOST: '%'
     volumes:
       - dbdata:/var/lib/mysql
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 networks:
   app-network:
