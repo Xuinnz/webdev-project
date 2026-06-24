@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\Session;
 
 class DoctorController extends Controller
 {
-    private const CALENDAR_START_HOUR = 9;
-    private const CALENDAR_END_HOUR = 18;
+    private const CALENDAR_START_HOUR = 8;
+    private const CALENDAR_END_HOUR = 17;
     private const CALENDAR_TOTAL_MINUTES = 540;
 
     public function dashboard()
@@ -204,6 +204,7 @@ class DoctorController extends Controller
     public function getProfile()
     {
         $userId = Session::get('user_id');
+    
         $profile = DB::table('users')
             ->where('users.id', $userId)
             ->leftJoin('doctor_profiles', 'users.id', '=', 'doctor_profiles.user_id')
@@ -219,50 +220,136 @@ class DoctorController extends Controller
                 'doctor_profiles.bio',
                 'doctor_profiles.consultation_fee',
                 'doctor_profiles.specialty_id',
+                'doctor_profiles.slot_duration_minutes',
                 'specialties.name as specialty_name'
             )
             ->first();
-
-        $specialties = DB::table('specialties')->orderBy('name')->get();
-
-        return view('doctor.profile', compact('profile', 'specialties'));
+    
+        $specialties     = DB::table('specialties')->orderBy('name')->get();
+        $duration        = $profile->slot_duration_minutes ?? 30;
+    
+        // Fetch existing schedule rows for this doctor
+        $scheduleRows = DB::table('doctor_schedules')
+            ->where('doctor_id', $userId)
+            ->get()
+            ->keyBy('weekday');  // keyed by weekday int for easy lookup
+    
+        // Decode each day's slot_mask back into selectedStarts
+        // so Alpine can pre-populate the grid exactly as it was saved
+        $existingSchedule = [];
+        foreach ($scheduleRows as $weekday => $row) {
+            $existingSchedule[$weekday] = $this->decodeMaskToStarts((int) $row->slot_mask, $duration);
+        }
+    
+        // Generate slots for the current duration to pass to the view
+        $slots = $this->generateSlots($duration);
+        $durations = $this->availableDurations();
+    
+        return view('doctor.profile', compact(
+            'profile',
+            'specialties',
+            'slots',
+            'duration',
+            'existingSchedule',
+            'durations'
+        ));
     }
-
+    
+    // ──────────────────────────────────────────────────────────────
+    //  updateProfile
+    // ──────────────────────────────────────────────────────────────
+    
     public function updateProfile(Request $request)
     {
-        $userId = Session::get('user_id');
+        $userId    = Session::get('user_id');
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'phone' => 'required|string|max:20',
-            'gender' => 'required|in:male,female,other',
-            'avatar_url' => 'nullable|url|max:500',
-            'specialty_id' => 'required|exists:specialties,id',
-            'bio' => 'nullable|string',
-            'consultation_fee' => 'required|numeric|min:0',
+            'name'                               => 'required|string|max:255',
+            'phone'                              => 'required|string|max:20',
+            'gender'                             => 'required|in:male,female,other',
+            'avatar_url'                         => 'nullable|url|max:500',
+            'specialty_id'                       => 'required|exists:specialties,id',
+            'bio'                                => 'nullable|string',
+            'consultation_fee'                   => 'required|numeric|min:0',
+            'slot_duration_minutes'              => 'required|integer|in:15,30,45,60,90,120',
+            'schedules'                          => 'required|array|min:1',
+            'schedules.*.weekday'                => 'required|integer|between:0,6',
+            'schedules.*.ranges'                 => 'required|array|min:1',
+            'schedules.*.ranges.*.start'         => 'required|date_format:H:i',
+            'schedules.*.ranges.*.end'           => 'required|date_format:H:i|after:schedules.*.ranges.*.start',
         ]);
-
+    
         try {
             DB::transaction(function () use ($userId, $validated) {
+    
                 DB::table('users')->where('id', $userId)->update([
-                    'name' => $validated['name'],
-                    'phone' => $validated['phone'],
-                    'gender' => $validated['gender'],
+                    'name'       => $validated['name'],
+                    'phone'      => $validated['phone'],
+                    'gender'     => $validated['gender'],
                     'avatar_url' => $validated['avatar_url'] ?? null,
+                    'updated_at' => now(),
                 ]);
+    
                 DB::table('doctor_profiles')->where('user_id', $userId)->update([
-                    'specialty_id' => $validated['specialty_id'],
-                    'bio' => $validated['bio'] ?? null,
-                    'consultation_fee' => $validated['consultation_fee'],
+                    'specialty_id'          => $validated['specialty_id'],
+                    'bio'                   => $validated['bio'] ?? null,
+                    'consultation_fee'      => $validated['consultation_fee'],
+                    'slot_duration_minutes' => $validated['slot_duration_minutes'],
+                    'updated_at'            => now(),
                 ]);
+    
+                // Delete existing schedule rows and reinsert
+                // Simpler than diffing — schedule changes are infrequent
+                DB::table('doctor_schedules')->where('doctor_id', $userId)->delete();
+    
+                $scheduleInserts = [];
+                foreach ($validated['schedules'] as $schedule) {
+                    $scheduleInserts[] = [
+                        'doctor_id' => $userId,
+                        'weekday'   => $schedule['weekday'],
+                        'slot_mask' => $this->calculateSlotMask($schedule['ranges']),
+                    ];
+                }
+    
+                DB::table('doctor_schedules')->insert($scheduleInserts);
             });
-
-            return redirect()->back()->with('success', 'Your profile has been successfully updated.');
+    
+            return redirect()->back()->with('success', 'Profile updated successfully.');
+    
         } catch (\Exception $e) {
             return redirect()->back()
                 ->withErrors(['error' => 'Failed to update profile. Please try again.'])
                 ->withInput();
         }
     }
+    
+    // ──────────────────────────────────────────────────────────────
+    //  PRIVATE: decode a slot_mask back to an array of start strings
+    //  e.g. mask=3, duration=30 → ['08:00', '08:30'] (bits 0+1 set)
+    //  Used to pre-populate the schedule grid on profile edit
+    // ──────────────────────────────────────────────────────────────
+    
+    private function decodeMaskToStarts(int $mask, int $durationMinutes): array
+    {
+        $bitsPerSlot = $durationMinutes / 15;
+        $starts      = [];
+        $totalBits   = 36; // 08:00 → 17:00
+    
+        for ($bit = 0; $bit + $bitsPerSlot <= $totalBits; $bit += $bitsPerSlot) {
+            // Build the mask for this slot
+            $slotMask = ((1 << $bitsPerSlot) - 1) << $bit;
+    
+            // If all bits of this slot are set, the slot was selected
+            if (($mask & $slotMask) === $slotMask) {
+                $startMinutes = 8 * 60 + $bit * 15;
+                $h = str_pad((int) floor($startMinutes / 60), 2, '0', STR_PAD_LEFT);
+                $m = str_pad($startMinutes % 60, 2, '0', STR_PAD_LEFT);
+                $starts[] = "{$h}:{$m}";
+            }
+        }
+    
+        return $starts;
+    }
+
     private function generateSlots(int $durationMinutes): array
     {
         $slots   = [];

@@ -100,7 +100,7 @@ class AppointmentController extends Controller
                 'end_time'       => date('g:i A', strtotime($fullEnd)),
                 'status_label'   => ucfirst($app->status),
                 'reason'         => $app->reason ?? 'N/A',
-                'is_cancellable' => $app->status === 'pending' || $app->status === 'confirmed'
+                'is_cancellable' => $app->status === 'pending'
             ];
         })->toArray();
 

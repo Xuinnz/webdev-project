@@ -26,6 +26,7 @@ class PatientController extends Controller
             ->join('users', 'appointments.doctor_id', '=', 'users.id')
             ->where('appointments.patient_id', $patientId)
             ->where('appointments.status', '!=', 'cancelled')
+            ->where('appointments.appointment_date', '>=', Carbon::now('Asia/Manila')->toDateString()) // add this
             ->select(
                 'users.name as doctor_name',
                 'appointments.type',
@@ -37,6 +38,7 @@ class PatientController extends Controller
             ->orderBy('appointments.start_time', 'asc')
             ->limit(5)
             ->get();
+
 
         $appointments = $appointmentsData->map(function ($app) {
             $fullStartStr = $app->appointment_date . ' ' . $app->start_time;

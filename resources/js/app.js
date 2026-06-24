@@ -111,136 +111,155 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
-    Alpine.data('onboardingForm', (initialSlots, initialDuration) => ({
+    Alpine.data('onboardingForm', (initialSlots, initialDuration, existingSchedule = {}) => ({
         duration: parseInt(initialDuration),
-        
-        // Standard week
+    
         days: [
-            { weekday: 1, label: 'Monday', short: 'Mon', enabled: false, selectedStarts: [] },
-            { weekday: 2, label: 'Tuesday', short: 'Tue', enabled: false, selectedStarts: [] },
+            { weekday: 1, label: 'Monday',    short: 'Mon', enabled: false, selectedStarts: [] },
+            { weekday: 2, label: 'Tuesday',   short: 'Tue', enabled: false, selectedStarts: [] },
             { weekday: 3, label: 'Wednesday', short: 'Wed', enabled: false, selectedStarts: [] },
-            { weekday: 4, label: 'Thursday', short: 'Thu', enabled: false, selectedStarts: [] },
-            { weekday: 5, label: 'Friday', short: 'Fri', enabled: false, selectedStarts: [] },
-            { weekday: 6, label: 'Saturday', short: 'Sat', enabled: false, selectedStarts: [] },
-            { weekday: 0, label: 'Sunday', short: 'Sun', enabled: false, selectedStarts: [] }
+            { weekday: 4, label: 'Thursday',  short: 'Thu', enabled: false, selectedStarts: [] },
+            { weekday: 5, label: 'Friday',    short: 'Fri', enabled: false, selectedStarts: [] },
+            { weekday: 6, label: 'Saturday',  short: 'Sat', enabled: false, selectedStarts: [] },
+            { weekday: 0, label: 'Sunday',    short: 'Sun', enabled: false, selectedStarts: [] },
         ],
-
-        // Dynamically build the time blocks based on the selected duration!
+    
+        // ── Lifecycle ──────────────────────────────────────────────
+        // Pre-populate days from existing schedule on profile edit
+        // existingSchedule shape: { "1": ["08:00","08:30"], "3": ["09:00"] }
+        // On onboarding it's always {}, so this is a no-op there
+        init() {
+            Object.entries(existingSchedule).forEach(([weekday, starts]) => {
+                const day = this.days.find(d => d.weekday === parseInt(weekday));
+                if (day && starts.length > 0) {
+                    day.enabled        = true;
+                    day.selectedStarts = starts;
+                }
+            });
+        },
+    
+        // ── Slot generation ────────────────────────────────────────
         get visibleSlots() {
-            let slots = [];
-            let currentMin = 8 * 60; // 08:00
-            let endMin = 17 * 60;    // 17:00
-
+            const slots      = [];
+            let currentMin   = 8 * 60;   // 08:00
+            const endMin     = 17 * 60;  // 17:00
+    
+            const fmt = (min) => {
+                const h = Math.floor(min / 60);
+                const m = (min % 60).toString().padStart(2, '0');
+                return `${h % 12 || 12}:${m} ${h >= 12 ? 'PM' : 'AM'}`;
+            };
+    
             while (currentMin + this.duration <= endMin) {
-                let startH = Math.floor(currentMin / 60).toString().padStart(2, '0');
-                let startM = (currentMin % 60).toString().padStart(2, '0');
-                
-                let nextMin = currentMin + this.duration;
-                let endH = Math.floor(nextMin / 60).toString().padStart(2, '0');
-                let endM = (nextMin % 60).toString().padStart(2, '0');
-
-                let formatTime = (min) => {
-                    let h = Math.floor(min / 60);
-                    let m = (min % 60).toString().padStart(2, '0');
-                    return `${h % 12 || 12}:${m} ${h >= 12 ? 'PM' : 'AM'}`;
-                };
-
+                const nextMin = currentMin + this.duration;
+                const startH  = Math.floor(currentMin / 60).toString().padStart(2, '0');
+                const startM  = (currentMin % 60).toString().padStart(2, '0');
+                const endH    = Math.floor(nextMin / 60).toString().padStart(2, '0');
+                const endM    = (nextMin % 60).toString().padStart(2, '0');
+    
                 slots.push({
                     start: `${startH}:${startM}`,
-                    end: `${endH}:${endM}`,
-                    label: `${formatTime(currentMin)} – ${formatTime(nextMin)}`
+                    end:   `${endH}:${endM}`,
+                    label: `${fmt(currentMin)} – ${fmt(nextMin)}`,
                 });
-
+    
                 currentMin += this.duration;
             }
             return slots;
         },
-
-        get durationHint() { return `Patients will book ${this.duration}-minute appointments.`; },
-
+    
+        get durationHint() {
+            return `Patients will book ${this.duration}-minute appointments.`;
+        },
+    
+        // ── Duration ───────────────────────────────────────────────
         setDuration(val) {
             this.duration = val;
-            // If they change the duration, clear the grid so times don't misalign
+            // Clear all selected slots — time boundaries no longer align
             this.days.forEach(d => d.selectedStarts = []);
         },
-
+    
+        // ── Day controls ───────────────────────────────────────────
         toggleDay(weekday) {
-            let day = this.days.find(d => d.weekday === weekday);
+            const day = this.days.find(d => d.weekday === weekday);
             if (day) day.enabled = !day.enabled;
         },
-
-        selectAll(weekday) {
-            let day = this.days.find(d => d.weekday === weekday);
-            if (day) day.selectedStarts = this.visibleSlots.map(s => s.start);
-        },
-
-        clearAll(weekday) {
-            let day = this.days.find(d => d.weekday === weekday);
-            if (day) day.selectedStarts = [];
-        },
-
+    
+        // ── Slot controls ──────────────────────────────────────────
         toggleSlot(weekday, startStr) {
-            let day = this.days.find(d => d.weekday === weekday);
-            if (day) {
-                let idx = day.selectedStarts.indexOf(startStr);
-                if (idx > -1) day.selectedStarts.splice(idx, 1);
-                else day.selectedStarts.push(startStr);
-            }
+            const day = this.days.find(d => d.weekday === weekday);
+            if (!day) return;
+            const idx = day.selectedStarts.indexOf(startStr);
+            if (idx > -1) day.selectedStarts.splice(idx, 1);
+            else day.selectedStarts.push(startStr);
         },
-
+    
         isSlotSelected(weekday, startStr) {
-            let day = this.days.find(d => d.weekday === weekday);
+            const day = this.days.find(d => d.weekday === weekday);
             return day ? day.selectedStarts.includes(startStr) : false;
         },
-
+    
+        selectAll(weekday) {
+            const day = this.days.find(d => d.weekday === weekday);
+            if (day) day.selectedStarts = this.visibleSlots.map(s => s.start);
+        },
+    
+        clearAll(weekday) {
+            const day = this.days.find(d => d.weekday === weekday);
+            if (day) day.selectedStarts = [];
+        },
+    
+        // ── Display helpers ────────────────────────────────────────
         selectedSlotCount(weekday) {
-            let day = this.days.find(d => d.weekday === weekday);
+            const day = this.days.find(d => d.weekday === weekday);
             return day ? day.selectedStarts.length : 0;
         },
-
+    
         selectedHours(weekday) {
             return (this.selectedSlotCount(weekday) * (this.duration / 60)).toFixed(1);
         },
-
-        // Format exactly how Laravel Validation expects it
+    
+        // ── Submit ─────────────────────────────────────────────────
+        // Injects hidden inputs in the shape Laravel validation expects:
+        // schedules[0][weekday], schedules[0][ranges][0][start], etc.
         prepareSubmit() {
             const container = document.getElementById('schedule-hidden-inputs');
-            container.innerHTML = ''; 
-
-            let idx = 0; 
-
+            container.innerHTML = '';
+    
+            let idx = 0;
             this.days.forEach(day => {
-                if (day.enabled && day.selectedStarts.length > 0) {
-                    
-                    let inputWeekday = document.createElement('input');
-                    inputWeekday.type = 'hidden';
-                    inputWeekday.name = `schedules[${idx}][weekday]`;
-                    inputWeekday.value = day.weekday;
-                    container.appendChild(inputWeekday);
-
-                    let rIdx = 0;
-                    this.visibleSlots.forEach(slot => {
-                        if (day.selectedStarts.includes(slot.start)) {
-                            let inStart = document.createElement('input');
-                            inStart.type = 'hidden';
-                            inStart.name = `schedules[${idx}][ranges][${rIdx}][start]`;
-                            inStart.value = slot.start;
-                            container.appendChild(inStart);
-
-                            let inEnd = document.createElement('input');
-                            inEnd.type = 'hidden';
-                            inEnd.name = `schedules[${idx}][ranges][${rIdx}][end]`;
-                            inEnd.value = slot.end;
-                            container.appendChild(inEnd);
-
-                            rIdx++;
-                        }
-                    });
-                    idx++;
-                }
+                if (!day.enabled || day.selectedStarts.length === 0) return;
+    
+                const wdInput   = document.createElement('input');
+                wdInput.type    = 'hidden';
+                wdInput.name    = `schedules[${idx}][weekday]`;
+                wdInput.value   = day.weekday;
+                container.appendChild(wdInput);
+    
+                let rIdx = 0;
+                this.visibleSlots.forEach(slot => {
+                    if (!day.selectedStarts.includes(slot.start)) return;
+    
+                    const inStart  = document.createElement('input');
+                    inStart.type   = 'hidden';
+                    inStart.name   = `schedules[${idx}][ranges][${rIdx}][start]`;
+                    inStart.value  = slot.start;
+                    container.appendChild(inStart);
+    
+                    const inEnd    = document.createElement('input');
+                    inEnd.type     = 'hidden';
+                    inEnd.name     = `schedules[${idx}][ranges][${rIdx}][end]`;
+                    inEnd.value    = slot.end;
+                    container.appendChild(inEnd);
+    
+                    rIdx++;
+                });
+    
+                idx++;
             });
-        }
+        },
     }));
+
 
 
 
