@@ -56,7 +56,12 @@ class PatientController extends Controller
  
         try {
             DB::transaction(function () use ($doctorId, $appointment, $validated) {
- 
+
+                DB::table('appointments')->where('id', $appointment->id)->update([
+                    'status'     => 'completed',
+                    'updated_at' => now(),
+                ]);
+
                 // ── Upsert medical record ──
                 $vitalsJson = !empty($validated['vitals'])
                     ? json_encode(array_filter($validated['vitals'], fn($v) => $v !== '' && $v !== null))
@@ -133,7 +138,7 @@ class PatientController extends Controller
  
         } catch (\Exception $e) {
             return back()
-                ->withErrors(['error' => 'Failed to update encounter. Please try again.'])
+                ->withErrors(['error' => $e->getMessage()])
                 ->withInput();
         }
     }
