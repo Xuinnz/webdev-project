@@ -123,7 +123,7 @@
                             <input type="text" id="dosage" name="dosage" class="form-input w-full" x-model="dosage" placeholder="e.g. 500mg">
                         </div>
                     </div>
-                    <div class="flex gap-3">
+                    <div class="flex gap-3" style="margin-top: 1rem;">
                         <button type="submit" class="unicare-btn-primary">Save</button>
                         <button type="button" class="unicare-btn-danger" @click="close()">Cancel</button>
                     </div>
