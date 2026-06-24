@@ -26,6 +26,7 @@
                         $links = [
                             ['label' => 'Home', 'route' => 'doctor.dashboard'],
                             ['label' => 'Patients', 'route' => 'doctor.patients.index'],
+                            ['label' => 'Profile', 'route' => 'doctor.profile'],
                         ];
                     @endphp
 

@@ -182,6 +182,69 @@ class DoctorController extends Controller
         }
     }
 
+    public function getProfile()
+    {
+        $userId = Session::get('user_id');
+        $profile = DB::table('users')
+            ->where('users.id', $userId)
+            ->leftJoin('doctor_profiles', 'users.id', '=', 'doctor_profiles.user_id')
+            ->leftJoin('specialties', 'doctor_profiles.specialty_id', '=', 'specialties.id')
+            ->select(
+                'users.id',
+                'users.name',
+                'users.email',
+                'users.phone',
+                'users.gender',
+                'users.avatar_url',
+                'doctor_profiles.license_number',
+                'doctor_profiles.bio',
+                'doctor_profiles.consultation_fee',
+                'doctor_profiles.specialty_id',
+                'specialties.name as specialty_name'
+            )
+            ->first();
+
+        $specialties = DB::table('specialties')->orderBy('name')->get();
+
+        return view('doctor.profile', compact('profile', 'specialties'));
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $userId = Session::get('user_id');
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'required|string|max:20',
+            'gender' => 'required|in:male,female,other',
+            'avatar_url' => 'nullable|url|max:500',
+            'specialty_id' => 'required|exists:specialties,id',
+            'bio' => 'nullable|string',
+            'consultation_fee' => 'required|numeric|min:0',
+        ]);
+
+        try {
+            DB::transaction(function () use ($userId, $validated) {
+                DB::table('users')->where('id', $userId)->update([
+                    'name' => $validated['name'],
+                    'phone' => $validated['phone'],
+                    'gender' => $validated['gender'],
+                    'avatar_url' => $validated['avatar_url'] ?? null,
+                ]);
+                DB::table('doctor_profiles')->where('user_id', $userId)->update([
+                    'specialty_id' => $validated['specialty_id'],
+                    'bio' => $validated['bio'] ?? null,
+                    'consultation_fee' => $validated['consultation_fee'],
+                ]);
+            });
+
+            return redirect()->back()->with('success', 'Your profile has been successfully updated.');
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->withErrors(['error' => 'Failed to update profile. Please try again.'])
+                ->withInput();
+        }
+    }
+
     private function calculateSlotMask(array $timeRanges): int
     {
         $baseTime = Carbon::createFromTimeString('08:00:00');

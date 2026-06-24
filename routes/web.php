@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\Patient\MedicalRecordController;
@@ -82,6 +81,10 @@ Route::middleware(['checkauth:doctor'])->prefix('doctor')->name('doctor.')->grou
 
     //SPECIALTY 
     Route::post('/specialty', [DoctorDoctorController::class, 'addSpecialty'])->name('specialty.store');
+
+    //PROFILE
+    Route::get('/profile', [DoctorDoctorController::class, 'getProfile'])->name('profile');
+    Route::post('/profile', [DoctorDoctorController::class, 'updateProfile'])->name('profile.update');
 
     //PATIENTS
     Route::get('/patients', [DoctorPatientController::class, 'getPatients'])->name('patients.index');
