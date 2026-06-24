@@ -14,7 +14,7 @@
             <div>
                 <div class="unicare-brand animate-unicare-in stagger-1">
                     <div class="unicare-logo">
-                        <img src="Logo.png">
+                        <img src="{{ asset('images/unicare-logo-white.png') }}">
                     </div>
                     <div>
                         <p class="unicare-brand-title">UNICare</p>
@@ -25,10 +25,10 @@
                 <nav class="unicare-nav">
                     @php
                         $links = [
-                            ['label' => 'Home', 'route' => 'patient.home'],
-                            ['label' => 'Appointment', 'route' => 'patient.appointments'],
+                            ['label' => 'Home', 'route' => 'patient.dashboard'],
+                            ['label' => 'Appointment', 'route' => 'patient.appointment'],
                             ['label' => 'Medical Record', 'route' => 'patient.medical-records'],
-                            ['label' => 'Chat', 'route' => 'patient.chat'],
+                            ['label' => 'Profile', 'route' => 'patient.profile'],
                         ];
                     @endphp
 

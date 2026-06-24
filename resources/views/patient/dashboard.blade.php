@@ -57,7 +57,6 @@
                 <h2 class="section-title">{{ $calendar['label'] }}</h2>
                 <div class="glass-panel p-4">
                     <div class="calendar-header grid grid-cols-8 gap-1 text-center font-bold mb-2">
-                        <span></span>
                         <span>Mo</span>
                         <span>Tu</span>
                         <span>We</span>
@@ -72,16 +71,13 @@
                             'calendar-week grid grid-cols-8 gap-1 text-center animate-unicare-in mb-1',
                             'stagger-' . min($weekIndex + 4, 8) => true,
                         ])>
-                            <div class="calendar-week-number opacity-50 text-sm flex items-center justify-center">
-                                {{ $week['number'] }}
-                            </div>
 
                             @foreach ($week['days'] as $day)
                                 <div @class([
                                     'calendar-day p-1 rounded-md flex items-center justify-center',
                                     'opacity-30' => ! $day['in_month'],
                                     'hover:bg-white/10 cursor-pointer' => $day['in_month'] && ! $day['is_today'],
-                                    'bg-blue-600 text-white font-bold' => $day['is_today'],
+                                    'bg-blue-500 text-white font-bold' => $day['is_today'],
                                 ])>
                                     {{ $day['date']->day }}
                                 </div>
@@ -90,7 +86,7 @@
                     @endforeach
                 </div>
             </section>
-
+<!-- 
             <section class="animate-unicare-in stagger-5 mt-6">
                 <h2 class="section-title">Recent Messages</h2>
                 <div class="unicare-card-dark unicare-card-dark--tall p-4 rounded-xl">
@@ -105,7 +101,7 @@
                         @endforelse
                     </div>
                 </div>
-            </section>
+            </section> -->
         </div>
     </div>
 @endsection
