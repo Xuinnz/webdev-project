@@ -72,6 +72,8 @@ class DoctorController extends Controller
             $duration = $endMinutes - $startMinutes;
 
             return (object) [
+                'id' => $appointment->id,   
+                'status' => $appointment->status,
                 'uuid' => $appointment->uuid,
                 'patient_name' => $appointment->patient_name,
                 'patient_email' => $appointment->patient_email,
@@ -105,63 +107,80 @@ class DoctorController extends Controller
 
     public function showOnBoarding()
     {
-        $specialties = DB::table('specialties')->get();
-
-        return view('doctor.onboarding', compact('specialties'));
+        $specialties     = DB::table('specialties')->orderBy('name')->get();
+        $defaultDuration = 30;
+ 
+        return view('doctor.onboarding', [
+            'specialties' => $specialties,
+            'slots'       => $this->generateSlots($defaultDuration),
+            'durations'   => $this->availableDurations(),
+        ]);
     }
+
 
     public function processOnBoarding(Request $request)
     {
-        $userId = Session::get('user_id');
+        $userId    = Session::get('user_id');
         $validated = $request->validate([
-            'phone' => 'required|string|max:20',
-            'gender' => 'required|in:male,female,other',
-            'avatar_url' => 'nullable|url|max:500',
-            'specialty_id' => 'required|exists:specialties,id',
-            'license_number' => 'required|string|max:100',
-            'bio' => 'nullable|string',
-            'consultation_fee' => 'required|numeric|min:0',
-            'schedules' => 'required|array|min:1',
-            'schedules.*.weekday' => 'required|integer|between:0,6',
-            'schedules.*.ranges' => 'required|array|min:1',
-            'schedules.*.ranges.*.start' => 'required|date_format:H:i',
-            'schedules.*.ranges.*.end' => 'required|date_format:H:i|after:schedules.*.ranges.*.start',
+            'phone'                              => 'required|string|max:20',
+            'gender'                             => 'required|in:male,female,other',
+            'avatar_url'                         => 'nullable|url|max:500',
+            'specialty_id'                       => 'required|exists:specialties,id',
+            'license_number'                     => 'required|string|max:100',
+            'bio'                                => 'nullable|string',
+            'consultation_fee'                   => 'required|numeric|min:0',
+            'slot_duration_minutes'              => 'required|integer|in:15,30,45,60,90,120',
+            'schedules'                          => 'required|array|min:1',
+            'schedules.*.weekday'                => 'required|integer|between:0,6',
+            'schedules.*.ranges'                 => 'required|array|min:1',
+            'schedules.*.ranges.*.start'         => 'required|date_format:H:i',
+            'schedules.*.ranges.*.end'           => 'required|date_format:H:i|after:schedules.*.ranges.*.start',
         ]);
-
+ 
         try {
             DB::transaction(function () use ($userId, $validated) {
+ 
                 DB::table('users')->where('id', $userId)->update([
-                    'phone' => $validated['phone'],
-                    'gender' => $validated['gender'],
+                    'phone'      => $validated['phone'],
+                    'gender'     => $validated['gender'],
                     'avatar_url' => $validated['avatar_url'] ?? null,
                 ]);
-
+ 
                 $profileId = DB::table('doctor_profiles')->insertGetId([
-                    'user_id' => $userId,
-                    'specialty_id' => $validated['specialty_id'],
-                    'license_number' => $validated['license_number'],
-                    'bio' => $validated['bio'] ?? null,
-                    'consultation_fee' => $validated['consultation_fee'],
+                    'user_id'                => $userId,
+                    'specialty_id'           => $validated['specialty_id'],
+                    'license_number'         => $validated['license_number'],
+                    'bio'                    => $validated['bio'] ?? null,
+                    'consultation_fee'       => $validated['consultation_fee'],
+                    'slot_duration_minutes'  => $validated['slot_duration_minutes'],
+                    'created_at'             => now(),
+                    'updated_at'             => now(),
                 ]);
-
+ 
                 $scheduleInserts = [];
                 foreach ($validated['schedules'] as $schedule) {
                     $scheduleInserts[] = [
-                        'doctor_id' => $userId,
-                        'weekday' => $schedule['weekday'],
-                        'slot_mask' => $this->calculateSlotMask($schedule['ranges']),
+                        'doctor_id'  => $userId,
+                        'weekday'    => $schedule['weekday'],
+                        'slot_mask'  => $this->calculateSlotMask($schedule['ranges']),
                     ];
                 }
-
+ 
                 DB::table('doctor_schedules')->insert($scheduleInserts);
                 Session::put('profile_id', $profileId);
             });
-
-            return redirect()->route('doctor.dashboard')->with('success', 'Welcome! Your profile is complete.');
+ 
+            return redirect()
+                ->route('doctor.dashboard')
+                ->with('success', 'Welcome! Your profile is complete.');
+ 
         } catch (\Exception $e) {
-            return back()->withErrors(['error' => 'Failed to save onboarding details. Please try again.'])->withInput();
+            return back()
+                ->withErrors(['error' => $e->getMessage()])
+                ->withInput();
         }
     }
+
 
     public function addSpecialty(Request $request)
     {
@@ -243,6 +262,38 @@ class DoctorController extends Controller
                 ->withErrors(['error' => 'Failed to update profile. Please try again.'])
                 ->withInput();
         }
+    }
+    private function generateSlots(int $durationMinutes): array
+    {
+        $slots   = [];
+        $current = Carbon::createFromTimeString('08:00:00');
+        $end     = Carbon::createFromTimeString('17:00:00');
+ 
+        while ($current->copy()->addMinutes($durationMinutes)->lte($end)) {
+            $slotEnd = $current->copy()->addMinutes($durationMinutes);
+ 
+            $slots[] = [
+                'start' => $current->format('H:i'),
+                'end'   => $slotEnd->format('H:i'),
+                'label' => $current->format('g:i A') . ' – ' . $slotEnd->format('g:i A'),
+            ];
+ 
+            $current->addMinutes($durationMinutes);
+        }
+ 
+        return $slots;
+    }
+
+    private function availableDurations(): array
+    {
+        return [
+            ['value' => 15,  'label' => '15 min'],
+            ['value' => 30,  'label' => '30 min'],
+            ['value' => 45,  'label' => '45 min'],
+            ['value' => 60,  'label' => '1 hr'],
+            ['value' => 90,  'label' => '1 hr 30 min'],
+            ['value' => 120, 'label' => '2 hrs'],
+        ];
     }
 
     private function calculateSlotMask(array $timeRanges): int
