@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>@yield('title', 'UNICare') — Doctor Portal</title>
+    <title>@yield('title', 'UNICare') — The University Hospital</title>
     <link rel="stylesheet" href="{{ asset('css/patient.css') }}">
     @vite(['resources/js/app.js'])
 </head>
@@ -17,18 +17,15 @@
                     </div>
                     <div>
                         <p class="unicare-brand-title">UNICare</p>
-                        <p class="unicare-brand-subtitle">Doctor Portal</p>
+                        <p class="unicare-brand-subtitle">The University Hospital</p>
                     </div>
                 </div>
 
                 <nav class="unicare-nav">
                     @php
                         $links = [
-                            ['label' => 'Dashboard', 'route' => 'doctor.dashboard'],
-                            ['label' => 'Appointments', 'route' => 'doctor.appointments.index'],
+                            ['label' => 'Home', 'route' => 'doctor.dashboard'],
                             ['label' => 'Patients', 'route' => 'doctor.patients.index'],
-                            ['label' => 'Profile', 'route' => 'doctor.profile'],
-                            ['label' => 'Schedule', 'route' => 'doctor.schedule'],
                         ];
                     @endphp
 
@@ -50,7 +47,7 @@
 
             <form action="{{ route('auth.logout') }}" method="POST">
                 @csrf
-                <button type="submit" class="unicare-logout animate-unicare-in stagger-6 w-full text-left border-0 bg-transparent cursor-pointer">
+                <button type="submit" class="unicare-logout animate-unicare-in stagger-6">
                     <span aria-hidden="true">&#8614;</span>
                     Logout
                 </button>

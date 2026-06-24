@@ -3,75 +3,121 @@
 namespace App\Http\Controllers\Doctor;
 
 use App\Http\Controllers\Controller;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 
 class DoctorController extends Controller
 {
+    private const CALENDAR_START_HOUR = 9;
+    private const CALENDAR_END_HOUR = 18;
+    private const CALENDAR_TOTAL_MINUTES = 540;
+
     public function dashboard()
     {
         $userId = Session::get('user_id');
-        $doctor = DB::table('users')->where('id', $userId)->first();
-        $today = now()->toDateString();
+        $today = Carbon::today();
+        $weekStart = $today->copy()->startOfWeek(Carbon::MONDAY);
+        $weekEnd = $weekStart->copy()->addDays(6);
 
-        $todayAppointments = DB::table('appointments')
+        $weekDays = [];
+        for ($i = 0; $i < 7; $i++) {
+            $date = $weekStart->copy()->addDays($i);
+            $weekDays[] = [
+                'date' => $date->toDateString(),
+                'label' => $date->format('j') . ' ' . $date->format('D'),
+                'is_today' => $date->isSameDay($today),
+                'column' => $i + 1,
+            ];
+        }
+
+        $rawAppointments = DB::table('appointments')
             ->join('users as patients', 'appointments.patient_id', '=', 'patients.id')
+            ->leftJoin('patient_profiles', 'patients.id', '=', 'patient_profiles.user_id')
             ->where('appointments.doctor_id', $userId)
-            ->where('appointments.appointment_date', $today)
-            ->select('appointments.*', 'patients.name as patient_name')
+            ->whereBetween('appointments.appointment_date', [$weekStart->toDateString(), $weekEnd->toDateString()])
+            ->whereIn('appointments.status', ['confirmed', 'pending', 'completed'])
+            ->select(
+                'appointments.*',
+                'patients.name as patient_name',
+                'patients.email as patient_email',
+                'patients.phone as patient_phone',
+                'patients.gender as patient_gender',
+                'patient_profiles.date_of_birth as patient_dob',
+                'patient_profiles.blood_type as patient_blood_type',
+                'patient_profiles.height_cm as patient_height',
+                'patient_profiles.weight_kg as patient_weight',
+                'patient_profiles.allergies as patient_allergies',
+                'patient_profiles.chronic_conditions as patient_chronic_conditions',
+                'patient_profiles.emergency_contact_name as patient_emergency_contact_name',
+                'patient_profiles.emergency_contact_phone as patient_emergency_contact_phone'
+            )
+            ->orderBy('appointments.appointment_date')
             ->orderBy('appointments.start_time')
             ->get();
 
-        $stats = [
-            'today_appointments' => $todayAppointments->count(),
-            'total_patients' => DB::table('appointments')
-                ->where('doctor_id', $userId)
-                ->distinct()
-                ->count('patient_id'),
-            'upcoming_appointments' => DB::table('appointments')
-                ->where('doctor_id', $userId)
-                ->where('appointment_date', '>=', $today)
-                ->whereIn('status', ['confirmed', 'pending'])
-                ->count(),
-        ];
+        $dateToColumn = collect($weekDays)->pluck('column', 'date');
 
-        return view('doctor.dashboard', compact('doctor', 'stats', 'todayAppointments'));
+        $calendarAppointments = $rawAppointments->map(function ($appointment) use ($dateToColumn) {
+            $start = Carbon::parse($appointment->appointment_date . ' ' . $appointment->start_time);
+            $end = Carbon::parse($appointment->appointment_date . ' ' . $appointment->end_time);
+            $gridStart = $start->copy()->setTime(self::CALENDAR_START_HOUR, 0);
+            $gridEnd = $start->copy()->setTime(self::CALENDAR_END_HOUR, 0);
+
+            $startMinutes = max(0, min(self::CALENDAR_TOTAL_MINUTES, $gridStart->diffInMinutes($start)));
+            $endMinutes = max($startMinutes + 15, min(self::CALENDAR_TOTAL_MINUTES, $gridStart->diffInMinutes($end)));
+            $duration = $endMinutes - $startMinutes;
+
+            return (object) [
+                'uuid' => $appointment->uuid,
+                'patient_name' => $appointment->patient_name,
+                'patient_email' => $appointment->patient_email,
+                'patient_phone' => $appointment->patient_phone ?? '—',
+                'patient_gender' => $appointment->patient_gender ? ucfirst($appointment->patient_gender) : '—',
+                'patient_dob' => $appointment->patient_dob ?? '—',
+                'patient_blood_type' => $appointment->patient_blood_type ?? '—',
+                'patient_height' => $appointment->patient_height ? $appointment->patient_height . ' cm' : '—',
+                'patient_weight' => $appointment->patient_weight ? $appointment->patient_weight . ' kg' : '—',
+                'patient_allergies' => is_string($appointment->patient_allergies) ? json_decode($appointment->patient_allergies) : ($appointment->patient_allergies ?? []),
+                'patient_chronic_conditions' => is_string($appointment->patient_chronic_conditions) ? json_decode($appointment->patient_chronic_conditions) : ($appointment->patient_chronic_conditions ?? []),
+                'patient_emergency_contact_name' => $appointment->patient_emergency_contact_name ?? '—',
+                'patient_emergency_contact_phone' => $appointment->patient_emergency_contact_phone ?? '—',
+                'type' => $appointment->type,
+                'type_label' => $appointment->type === 'telemedicine' ? 'Telemedicine' : 'In-Person',
+                'time_label' => $start->format('g:i A') . ' - ' . $end->format('g:i A'),
+                'grid_column' => $dateToColumn[$appointment->appointment_date] ?? 1,
+                'top_percent' => ($startMinutes / self::CALENDAR_TOTAL_MINUTES) * 100,
+                'height_percent' => ($duration / self::CALENDAR_TOTAL_MINUTES) * 100,
+            ];
+        });
+
+        $calendarHours = [];
+        for ($hour = self::CALENDAR_START_HOUR; $hour <= self::CALENDAR_END_HOUR; $hour++) {
+            $calendarHours[] = sprintf('%02d:00', $hour);
+        }
+
+        return view('doctor.dashboard', compact('weekDays', 'calendarAppointments', 'calendarHours'));
     }
 
-    //show onboarding view
-    public function showOnBoarding(){
+    public function showOnBoarding()
+    {
         $specialties = DB::table('specialties')->get();
 
         return view('doctor.onboarding', compact('specialties'));
     }
-        /* 
-        Doctor schedule should look like this
-        "schedules": [
-        {
-            "weekday": 1, 
-            "ranges": [
-                { "start": "08:00", "end": "11:00" },
-                { "start": "13:00", "end": "17:00" }
-            ]
-        }
-        ]
-        */
-    public function processOnBoarding(Request $request){
+
+    public function processOnBoarding(Request $request)
+    {
         $userId = Session::get('user_id');
         $validated = $request->validate([
-            // users table
             'phone' => 'required|string|max:20',
             'gender' => 'required|in:male,female,other',
-            'avatar_url' => 'nullable|url|max:500', 
-            
-            // doctor profile table
+            'avatar_url' => 'nullable|url|max:500',
             'specialty_id' => 'required|exists:specialties,id',
             'license_number' => 'required|string|max:100',
             'bio' => 'nullable|string',
             'consultation_fee' => 'required|numeric|min:0',
-            
-            // doctor schedule
             'schedules' => 'required|array|min:1',
             'schedules.*.weekday' => 'required|integer|between:0,6',
             'schedules.*.ranges' => 'required|array|min:1',
@@ -80,9 +126,7 @@ class DoctorController extends Controller
         ]);
 
         try {
-            //transaction for all pass or all fails
             DB::transaction(function () use ($userId, $validated) {
-
                 DB::table('users')->where('id', $userId)->update([
                     'phone' => $validated['phone'],
                     'gender' => $validated['gender'],
@@ -96,222 +140,59 @@ class DoctorController extends Controller
                     'bio' => $validated['bio'] ?? null,
                     'consultation_fee' => $validated['consultation_fee'],
                 ]);
-                //put it in an array
+
                 $scheduleInserts = [];
                 foreach ($validated['schedules'] as $schedule) {
-                    // call helper function to turn time into int
-                    $calculatedMask = $this->calculateSlotMask($schedule['ranges']);
-
                     $scheduleInserts[] = [
                         'doctor_id' => $userId,
                         'weekday' => $schedule['weekday'],
-                        'slot_mask' => $calculatedMask, 
+                        'slot_mask' => $this->calculateSlotMask($schedule['ranges']),
                     ];
                 }
-                
-                // batch insert
+
                 DB::table('doctor_schedules')->insert($scheduleInserts);
                 Session::put('profile_id', $profileId);
             });
 
             return redirect()->route('doctor.dashboard')->with('success', 'Welcome! Your profile is complete.');
-
         } catch (\Exception $e) {
             return back()->withErrors(['error' => 'Failed to save onboarding details. Please try again.'])->withInput();
         }
     }
 
-    //add general doctor specialties 
-    public function addSpecialty(Request $request){
+    public function addSpecialty(Request $request)
+    {
         $request->validate([
             'name' => 'required|string|max:100|unique:specialties,name',
             'description' => 'nullable|string|max:255',
         ]);
+
         try {
             DB::table('specialties')->insert([
                 'name' => $request->name,
-                'description' => $request->description
+                'description' => $request->description,
             ]);
-            return redirect()->back()->with('success', $request->name . ' has been successfully added to the specialties list!');
 
+            return redirect()->back()->with('success', $request->name . ' has been successfully added to the specialties list!');
         } catch (\Exception $e) {
             return redirect()->back()->withErrors(['error' => 'Failed to add specialty. It might already exist.']);
         }
     }
 
-    //get session doctor profile
-    public function getProfile(){
-        $userId = Session::get('user_id');
-        $profile = DB::table('users')
-            ->where('users.id', $userId)
-            ->leftJoin('doctor_profiles', 'users.id', '=', 'doctor_profiles.user_id')
-            ->leftJoin('specialties', 'doctor_profiles.specialty_id', '=', 'specialties.id')
-            ->select(
-                'users.id',
-                'users.name',
-                'users.email',
-                'users.phone',
-                'users.gender',
-                'users.avatar_url',
-                'doctor_profiles.license_number',
-                'doctor_profiles.bio',
-                'doctor_profiles.consultation_fee',
-                'doctor_profiles.specialty_id',
-                'specialties.name as specialty_name'
-            )
-            ->first();
-
-        $specialties = DB::table('specialties')->orderBy('name')->get();
-        
-        return view('doctor.profile', compact('profile', 'specialties'));
-    }
-    
-    //update session doctor profile
-    public function updateProfile(Request $request)
+    private function calculateSlotMask(array $timeRanges): int
     {
-        $userId = Session::get('user_id');
-        $validated = $request->validate([
-            // users table
-            'name' => 'required|string|max:255',
-            'phone' => 'required|string|max:20',
-            'gender' => 'required|in:male,female,other',
-            'avatar_url' => 'nullable|url|max:500', 
-            
-            // doctor profiles table
-            'specialty_id' => 'required|exists:specialties,id',
-            'bio' => 'nullable|string',
-            'consultation_fee' => 'required|numeric|min:0',
-        ]);
-
-        try {
-            DB::transaction(function () use ($userId, $validated) {
-                DB::table('users')->where('id', $userId)->update([
-                    'name' => $validated['name'],
-                    'phone' => $validated['phone'],
-                    'gender' => $validated['gender'],
-                    'avatar_url' => $validated['avatar_url'] ?? null,
-                ]);
-                DB::table('doctor_profiles')->where('user_id', $userId)->update([
-                    'specialty_id' => $validated['specialty_id'],
-                    'bio' => $validated['bio'] ?? null,
-                    'consultation_fee' => $validated['consultation_fee'],
-                ]);
-            });
-            return redirect()->back()->with('success', 'Your profile has been successfully updated.');
-
-        } catch (\Exception $e) {
-            return redirect()->back()
-                             ->withErrors(['error' => 'Failed to update profile. Please try again.'])
-                             ->withInput();
-        }
-    }
-
-    //get session doctor template sched
-    public function getSchedule(){
-        $userId = Session::get('user_id');
-        $schedules = DB::table('doctor_schedules')->where('doctor_id', $userId)->get();
-
-        $formattedSchedules = [];
-        foreach ($schedules as $schedule) {
-            $formattedSchedules[] = [
-                'weekday' => $schedule->weekday,
-                'ranges' => $this->decodeSlotMask((int) $schedule->slot_mask) 
-            ];
-        }
-        return view('doctors.schedule', ['schedules' => $formattedSchedules]);
-    }
-
-    //update session doctor template 
-    public function editSchedule(Request $request)
-    {
-        $userId = Session::get('user_id');
-        $validated = $request->validate([
-            'schedules' => 'required|array|min:1',
-            'schedules.*.weekday' => 'required|integer|between:0,6',
-            'schedules.*.ranges' => 'required|array|min:1',
-            'schedules.*.ranges.*.start' => 'required|date_format:H:i',
-            'schedules.*.ranges.*.end' => 'required|date_format:H:i|after:schedules.*.ranges.*.start',
-        ]);
-        //instead of updating, we delete the whole table, and create a new one.
-        try {
-            DB::transaction(function () use ($userId, $validated) {
-                DB::table('doctor_schedules')->where('doctor_id', $userId)->delete();
-                $scheduleInserts = [];
-                foreach ($validated['schedules'] as $schedule) {
-                    $calculatedMask = $this->calculateSlotMask($schedule['ranges']);
-
-                    $scheduleInserts[] = [
-                        'doctor_id' => $userId,
-                        'weekday' => $schedule['weekday'],
-                        'slot_mask' => $calculatedMask,
-                    ];
-                }
-                DB::table('doctor_schedules')->insert($scheduleInserts);
-            });
-
-            return redirect()->back()->with('success', 'Your weekly schedule has been successfully updated!');
-
-        } catch (\Exception $e) {
-            return redirect()->back()
-                             ->withErrors(['error' => 'Failed to update schedule. Please try again.']);
-        }
-    }
-
-    //helper function to transform array to int
-    private function calculateSlotMask(array $timeRanges): int{
-        $baseTime = \Carbon\Carbon::createFromTimeString('08:00:00');
-        $dailyMask = 0; // Start with 0 (Fully booked/Off-duty)
+        $baseTime = Carbon::createFromTimeString('08:00:00');
+        $dailyMask = 0;
 
         foreach ($timeRanges as $range) {
-            $startTime = \Carbon\Carbon::createFromTimeString($range['start']);
-            $endTime = \Carbon\Carbon::createFromTimeString($range['end']);
-
-            // calculate the start time bit position
+            $startTime = Carbon::createFromTimeString($range['start']);
+            $endTime = Carbon::createFromTimeString($range['end']);
             $startBit = $baseTime->diffInMinutes($startTime) / 15;
-            
-            // calculate how many bits is the duration
             $durationBits = $startTime->diffInMinutes($endTime) / 15;
-
-            // create a mask for this
             $chunkMask = ((1 << $durationBits) - 1) << $startBit;
-
-            // use bitwise or to combine everything
             $dailyMask = $dailyMask | $chunkMask;
         }
 
         return $dailyMask;
-    }
-
-    //helper function to transform int to arr
-    //basically, we transform sequence of 1 bits into readable time ranges
-    private function decodeSlotMask(int $mask): array{
-        $ranges = [];
-        $inRange = false;
-        $rangeStartBit = 0;
-        for ($i = 0; $i <= 36; $i++) {
-            
-            // check if ith position is 1
-            $isSet = ($mask & (1 << $i)) !== 0;
-
-            if ($isSet && !$inRange) {
-                //if we found a 1, time start
-                $inRange = true;
-                $rangeStartBit = $i;
-            } elseif (!$isSet && $inRange) {
-                //if we found a 0, stop counting since we got the time end
-                $inRange = false;
-                $rangeEndBit = $i;
-
-                // Convert the bit positions back to real time
-                $startTime = \Carbon\Carbon::parse('08:00:00')->addMinutes($rangeStartBit * 15)->format('H:i');
-                $endTime = \Carbon\Carbon::parse('08:00:00')->addMinutes($rangeEndBit * 15)->format('H:i');
-
-                $ranges[] = [
-                    'start' => $startTime,
-                    'end' => $endTime
-                ];
-            }
-        }
-        return $ranges;
     }
 }

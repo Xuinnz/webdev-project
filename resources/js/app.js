@@ -44,6 +44,30 @@ document.addEventListener('alpine:init', () => {
             }
         },
     }));
+
+    Alpine.data('encounterEdit', () => ({
+        isOpen: false,
+        uuid: '',
+        chief_complaint: '',
+        notes: '',
+        drug_name: '',
+        dosage: '',
+        formAction: '',
+
+        open(data) {
+            this.uuid = data.uuid;
+            this.chief_complaint = data.chief_complaint || '';
+            this.notes = data.notes || '';
+            this.drug_name = data.drug_name || '';
+            this.dosage = data.dosage || '';
+            this.formAction = `/doctor/appointments/${data.uuid}/encounter`;
+            this.isOpen = true;
+        },
+
+        close() {
+            this.isOpen = false;
+        },
+    }));
 });
 
 window.Alpine = Alpine;
