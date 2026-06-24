@@ -14,153 +14,179 @@ class PatientController extends Controller
     public function getPatients()
     {
         $doctorId = Session::get('user_id');
-        $today = now()->toDateString();
-
-        $todayPatients = $this->fetchAppointmentRows($doctorId, 'today', $today);
-        $upcomingPatients = $this->fetchAppointmentRows($doctorId, 'upcoming', $today);
-
-        return view('doctor.patients.index', compact('todayPatients', 'upcomingPatients'));
+        $today    = now()->toDateString();
+ 
+        return view('doctor.patients.index', [
+            'todayPatients'    => $this->fetchAppointmentRows($doctorId, 'today',    $today),
+            'upcomingPatients' => $this->fetchAppointmentRows($doctorId, 'upcoming', $today),
+        ]);
     }
+
 
     public function updateEncounter(Request $request, string $uuid)
     {
         $doctorId = Session::get('user_id');
-
+ 
         $appointment = DB::table('appointments')
             ->where('uuid', $uuid)
             ->where('doctor_id', $doctorId)
             ->first();
-
+ 
         if (!$appointment) {
             abort(404, 'Appointment not found.');
         }
-
+ 
         $validated = $request->validate([
-            'chief_complaint' => 'nullable|string|max:1000',
-            'notes' => 'nullable|string|max:5000',
-            'drug_name' => 'nullable|string|max:255',
-            'dosage' => 'nullable|string|max:100',
+            'chief_complaint'                => 'nullable|string|max:1000',
+            'diagnosis'                      => 'nullable|string|max:1000',
+            'notes'                          => 'nullable|string|max:5000',
+            'vitals'                         => 'nullable|array',
+            'vitals.bp'                      => 'nullable|string|max:20',
+            'vitals.hr'                      => 'nullable|numeric',
+            'vitals.temp_c'                  => 'nullable|numeric',
+            'vitals.weight_kg'               => 'nullable|numeric',
+            'prescriptions'                  => 'nullable|array',
+            'prescriptions.*.drug_name'      => 'required_with:prescriptions|string|max:255',
+            'prescriptions.*.dosage'         => 'required_with:prescriptions|string|max:100',
+            'prescriptions.*.frequency'      => 'required_with:prescriptions|string|max:100',
+            'prescriptions.*.duration'       => 'nullable|string|max:100',
+            'prescriptions.*.instructions'   => 'nullable|string|max:1000',
+            'prescriptions.*.valid_until'    => 'nullable|date',
         ]);
-
+ 
         try {
             DB::transaction(function () use ($doctorId, $appointment, $validated) {
+ 
+                // ── Upsert medical record ──
+                $vitalsJson = !empty($validated['vitals'])
+                    ? json_encode(array_filter($validated['vitals'], fn($v) => $v !== '' && $v !== null))
+                    : null;
+ 
                 $record = DB::table('medical_records')
                     ->where('appointment_id', $appointment->id)
                     ->first();
-
+ 
                 if ($record) {
-                    DB::table('medical_records')->where('id', $record->id)->update([
-                        'chief_complaint' => $validated['chief_complaint'] ?? null,
-                        'notes' => $validated['notes'] ?? null,
-                        'updated_at' => now(),
-                    ]);
+                    DB::table('medical_records')
+                        ->where('id', $record->id)
+                        ->update([
+                            'chief_complaint' => $validated['chief_complaint'] ?? null,
+                            'diagnosis'       => $validated['diagnosis']       ?? null,
+                            'notes'           => $validated['notes']           ?? null,
+                            'vitals'          => $vitalsJson,
+                            'updated_at'      => now(),
+                        ]);
                     $recordId = $record->id;
                 } else {
                     $recordId = DB::table('medical_records')->insertGetId([
-                        'uuid' => (string) Str::uuid(),
-                        'patient_id' => $appointment->patient_id,
-                        'doctor_id' => $doctorId,
-                        'appointment_id' => $appointment->id,
-                        'record_date' => $appointment->appointment_date,
+                        'uuid'            => (string) Str::uuid(),
+                        'patient_id'      => $appointment->patient_id,
+                        'doctor_id'       => $doctorId,
+                        'appointment_id'  => $appointment->id,
+                        'record_date'     => $appointment->appointment_date,
                         'chief_complaint' => $validated['chief_complaint'] ?? null,
-                        'notes' => $validated['notes'] ?? null,
-                        'created_at' => now(),
-                        'updated_at' => now(),
+                        'diagnosis'       => $validated['diagnosis']       ?? null,
+                        'notes'           => $validated['notes']           ?? null,
+                        'vitals'          => $vitalsJson,
+                        'created_at'      => now(),
+                        'updated_at'      => now(),
                     ]);
                 }
-
-                if (!empty($validated['drug_name'])) {
-                    $existingRx = DB::table('prescriptions')
+ 
+                // ── Replace prescriptions ──
+                // Delete existing ones for this record and re-insert from form
+                if (!empty($validated['prescriptions'])) {
+                    DB::table('prescriptions')
                         ->where('medical_record_id', $recordId)
-                        ->orderBy('issued_at', 'desc')
-                        ->first();
-
-                    if ($existingRx) {
-                        DB::table('prescriptions')->where('id', $existingRx->id)->update([
-                            'drug_name' => $validated['drug_name'],
-                            'dosage' => $validated['dosage'] ?? $existingRx->dosage,
-                            'updated_at' => now(),
-                        ]);
-                    } else {
-                        DB::table('prescriptions')->insert([
-                            'uuid' => (string) Str::uuid(),
+                        ->delete();
+ 
+                    $rxRows = [];
+                    foreach ($validated['prescriptions'] as $rx) {
+                        if (empty($rx['drug_name'])) continue;
+ 
+                        $rxRows[] = [
+                            'uuid'              => (string) Str::uuid(),
                             'medical_record_id' => $recordId,
-                            'patient_id' => $appointment->patient_id,
-                            'doctor_id' => $doctorId,
-                            'drug_name' => $validated['drug_name'],
-                            'dosage' => $validated['dosage'] ?? '—',
-                            'frequency' => 'As directed',
-                            'status' => 'active',
-                            'issued_at' => now(),
-                            'updated_at' => now(),
-                        ]);
+                            'patient_id'        => $appointment->patient_id,
+                            'doctor_id'         => $doctorId,
+                            'drug_name'         => $rx['drug_name'],
+                            'dosage'            => $rx['dosage'],
+                            'frequency'         => $rx['frequency'],
+                            'duration'          => $rx['duration']      ?? null,
+                            'instructions'      => $rx['instructions']  ?? null,
+                            'valid_until'       => $rx['valid_until']   ?? null,
+                            'status'            => 'active',
+                            'issued_at'         => now(),
+                            'updated_at'        => now(),
+                        ];
+                    }
+ 
+                    if (!empty($rxRows)) {
+                        DB::table('prescriptions')->insert($rxRows);
                     }
                 }
             });
-
-            return redirect()->route('doctor.patients.index')
-                ->with('success', 'Patient encounter updated successfully.');
+ 
+            return redirect()
+                ->route('doctor.patients.index')
+                ->with('success', 'Encounter updated successfully.');
+ 
         } catch (\Exception $e) {
-            return redirect()->back()
+            return back()
                 ->withErrors(['error' => 'Failed to update encounter. Please try again.'])
                 ->withInput();
         }
     }
 
-    public function confirmAppointment($id)
-    { 
-        $doctorId = Session::get('user_id');
 
-        // Security Check: Make sure this appointment actually belongs to the logged-in doctor
+    public function confirmAppointment($id)
+    {
+        $doctorId = Session::get('user_id');
+ 
         $appointment = DB::table('appointments')
             ->where('id', $id)
             ->where('doctor_id', $doctorId)
             ->first();
-
+ 
         if (!$appointment) {
-            return redirect()->back()->withErrors(['error' => 'Unauthorized action or appointment not found.']);
+            return back()->withErrors(['error' => 'Unauthorized or appointment not found.']);
         }
         if ($appointment->status !== 'pending') {
-            return redirect()->back()->withErrors(['error' => 'Appointment is already confirmed or cannot be changed.']);
+            return back()->withErrors(['error' => 'Appointment cannot be confirmed.']);
         }
-
-        // Update the status to confirmed
-        DB::table('appointments')
-            ->where('id', $id)
-            ->update([
-                'status' => 'confirmed',
-                'updated_at' => now(),
-            ]);
-
-        return redirect()->route('doctor.dashboard')->with('success', 'Appointment successfully confirmed.');
+ 
+        DB::table('appointments')->where('id', $id)->update([
+            'status'     => 'confirmed',
+            'updated_at' => now(),
+        ]);
+ 
+        return redirect()->route('doctor.dashboard')->with('success', 'Appointment confirmed.');
     }
-    public function cancelAppointment($id)
-    { 
-        $doctorId = Session::get('user_id');
 
-        // Security Check: Make sure this appointment actually belongs to the logged-in doctor
+    public function cancelAppointment($id)
+    {
+        $doctorId = Session::get('user_id');
+ 
         $appointment = DB::table('appointments')
             ->where('id', $id)
             ->where('doctor_id', $doctorId)
             ->first();
-
+ 
         if (!$appointment) {
-            return redirect()->back()->withErrors(['error' => 'Unauthorized action or appointment not found.']);
+            return back()->withErrors(['error' => 'Unauthorized or appointment not found.']);
         }
-        if ($appointment->status !== 'pending'){
-            return redirect()->back()->withErrors(['error' => 'Cannot cancel this appointment']);
+        if (!in_array($appointment->status, ['pending', 'confirmed'])) {
+            return back()->withErrors(['error' => 'Cannot cancel this appointment.']);
         }
-
-        // Update the status to confirmed
-        DB::table('appointments')
-            ->where('id', $id)
-            ->update([
-                'status' => 'cancelled',
-                'updated_at' => now(),
-            ]);
-
-        return redirect()->route('doctor.dashboard')->with('success', 'Appointment successfully confirmed.');
+ 
+        DB::table('appointments')->where('id', $id)->update([
+            'status'     => 'cancelled',
+            'updated_at' => now(),
+        ]);
+ 
+        return redirect()->route('doctor.dashboard')->with('success', 'Appointment cancelled.');
     }
+
 
     private function fetchAppointmentRows(int $doctorId, string $scope, string $today)
     {
@@ -170,44 +196,68 @@ class PatientController extends Controller
             ->where('appointments.doctor_id', $doctorId)
             ->whereIn('appointments.status', ['confirmed', 'pending', 'completed'])
             ->select(
+                'appointments.id',
                 'appointments.uuid',
                 'appointments.type',
                 'appointments.start_time',
                 'appointments.end_time',
                 'appointments.appointment_date',
+                'appointments.reason',
                 'patients.name as patient_name',
+                'medical_records.id as record_id',
                 'medical_records.chief_complaint',
+                'medical_records.diagnosis',
                 'medical_records.notes',
-                DB::raw('(SELECT drug_name FROM prescriptions WHERE medical_record_id = medical_records.id ORDER BY issued_at DESC LIMIT 1) as prescription_name'),
-                DB::raw('(SELECT dosage FROM prescriptions WHERE medical_record_id = medical_records.id ORDER BY issued_at DESC LIMIT 1) as prescription_dosage')
+                'medical_records.vitals'
             );
-
+ 
         if ($scope === 'today') {
             $query->where('appointments.appointment_date', $today)
-                ->orderBy('appointments.start_time');
+                  ->orderBy('appointments.start_time');
         } else {
             $query->where('appointments.appointment_date', '>', $today)
-                ->orderBy('appointments.appointment_date')
-                ->orderBy('appointments.start_time');
+                  ->orderBy('appointments.appointment_date')
+                  ->orderBy('appointments.start_time');
         }
-
+ 
         return $query->get()->map(function ($row) {
-            $start = Carbon::parse($row->start_time);
-            $end = Carbon::parse($row->end_time);
-
+            // Fetch all prescriptions for this record
+            $prescriptions = [];
+            $prescriptionSummary = null;
+ 
+            if ($row->record_id) {
+                $rxRows = DB::table('prescriptions')
+                    ->where('medical_record_id', $row->record_id)
+                    ->orderBy('issued_at')
+                    ->get(['drug_name', 'dosage', 'frequency', 'duration', 'instructions', 'valid_until']);
+ 
+                $prescriptions = $rxRows->map(fn($rx) => [
+                    'drug_name'    => $rx->drug_name,
+                    'dosage'       => $rx->dosage,
+                    'frequency'    => $rx->frequency,
+                    'duration'     => $rx->duration,
+                    'instructions' => $rx->instructions,
+                    'valid_until'  => $rx->valid_until,
+                ])->toArray();
+ 
+                $prescriptionSummary = $rxRows->isNotEmpty()
+                    ? $rxRows->map(fn($rx) => $rx->drug_name . ' ' . $rx->dosage)->implode(', ')
+                    : null;
+            }
+ 
             return (object) [
-                'uuid' => $row->uuid,
-                'patient_name' => $row->patient_name,
-                'type_label' => $row->type === 'telemedicine' ? 'Telemedicine' : 'In Person',
-                'start_time' => $start->format('g:i A'),
-                'end_time' => $end->format('g:i A'),
-                'chief_complaint' => $row->chief_complaint,
-                'notes' => $row->notes,
-                'prescription' => $row->prescription_name
-                    ? trim($row->prescription_name . ($row->prescription_dosage ? ' ' . $row->prescription_dosage : ''))
-                    : null,
-                'drug_name' => $row->prescription_name,
-                'dosage' => $row->prescription_dosage,
+                'uuid'                 => $row->uuid,
+                'patient_name'         => $row->patient_name,
+                'type_label'           => $row->type === 'telemedicine' ? 'Telemedicine' : 'In Person',
+                'start_time'           => Carbon::parse($row->start_time)->format('g:i A'),
+                'end_time'             => Carbon::parse($row->end_time)->format('g:i A'),
+                'reason'               => $row->reason,
+                'chief_complaint'      => $row->chief_complaint,
+                'diagnosis'            => $row->diagnosis,
+                'notes'                => $row->notes,
+                'vitals'               => $row->vitals ?? '{}',
+                'prescriptions'        => json_encode($prescriptions),
+                'prescription_summary' => $prescriptionSummary,
             ];
         });
     }

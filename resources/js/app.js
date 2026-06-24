@@ -276,27 +276,58 @@ document.addEventListener('alpine:init', () => {
 
     Alpine.data('encounterEdit', () => ({
         isOpen: false,
-        uuid: '',
-        chief_complaint: '',
-        notes: '',
-        drug_name: '',
-        dosage: '',
         formAction: '',
+        chief_complaint: '',
+        diagnosis: '',
+        notes: '',
+        vitals: { bp: '', hr: '', temp_c: '', weight_kg: '' },
+        prescriptions: [
+            { drug_name: '', dosage: '', frequency: '', duration: '', instructions: '', valid_until: '' }
+        ],
 
-        open(data) {
-            this.uuid = data.uuid;
-            this.chief_complaint = data.chief_complaint || '';
-            this.notes = data.notes || '';
-            this.drug_name = data.drug_name || '';
-            this.dosage = data.dosage || '';
-            this.formAction = `/doctor/appointments/${data.uuid}/encounter`;
+        openFromEl(el) {
+            this.formAction = `/doctor/appointments/${el.dataset.uuid}/encounter`;
+            this.chief_complaint = el.dataset.complaint || '';
+            this.diagnosis       = el.dataset.diagnosis  || '';
+            this.notes           = el.dataset.notes       || '';
+
+            const v = JSON.parse(el.dataset.vitals || '{}');
+            this.vitals = {
+                bp:        v.bp        ?? '',
+                hr:        v.hr        ?? '',
+                temp_c:    v.temp_c    ?? '',
+                weight_kg: v.weight_kg ?? '',
+            };
+
+            const rxRaw = JSON.parse(el.dataset.prescriptions || '[]');
+            this.prescriptions = rxRaw.length
+                ? rxRaw.map(rx => ({
+                    drug_name:    rx.drug_name    || '',
+                    dosage:       rx.dosage       || '',
+                    frequency:    rx.frequency    || '',
+                    duration:     rx.duration     || '',
+                    instructions: rx.instructions || '',
+                    valid_until:  rx.valid_until  || '',
+                }))
+                : [{ drug_name: '', dosage: '', frequency: '', duration: '', instructions: '', valid_until: '' }];
+
             this.isOpen = true;
         },
 
-        close() {
-            this.isOpen = false;
+        close() { this.isOpen = false; },
+
+        addRx() {
+            this.prescriptions.push({
+                drug_name: '', dosage: '', frequency: '',
+                duration: '', instructions: '', valid_until: ''
+            });
+        },
+
+        removeRx(i) {
+            if (this.prescriptions.length > 1) this.prescriptions.splice(i, 1);
         },
     }));
+
 });
 
 window.Alpine = Alpine;
