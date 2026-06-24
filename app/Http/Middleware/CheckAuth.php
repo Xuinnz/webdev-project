@@ -37,9 +37,9 @@ class CheckAuth
                 ->withErrors(['error' => 'Unauthorized access.']);
         }
         //on boarding middleware
-        if ($actualRole === 'doctor') {
+        if ($userRole === 'doctor') {
             $hasProfile = Session::has('profile_id');
-            $isOnboardingRoute = $request->routeIs('doctor.onboarding') || $request->routeIs('doctor.onboarding.submit');
+            $isOnboardingRoute = $request->routeIs('doctor.onboarding') || $request->routeIs('doctor.onboarding.store');
 
             //if no doctor profile yet, it means the doctor is not yet completed onboarding
             if (!$hasProfile && !$isOnboardingRoute) {

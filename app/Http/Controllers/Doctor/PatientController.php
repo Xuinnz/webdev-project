@@ -3,234 +3,157 @@
 namespace App\Http\Controllers\Doctor;
 
 use App\Http\Controllers\Controller;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
 
 class PatientController extends Controller
 {
-    // get session doctor patients
-    public function getPatients(){
+    public function getPatients()
+    {
         $doctorId = Session::get('user_id');
+        $today = now()->toDateString();
 
-        $patients = DB::table('users')
-            ->join('appointments', 'users.id', '=', 'appointments.patient_id')
-            ->where('appointments.doctor_id', $doctorId)
-            ->select(
-                'users.uuid', 
-                'users.name', 
-                'users.email', 
-                'users.phone', 
-                'users.gender', 
-                'users.avatar_url'
-            )
-            ->distinct() 
-            ->orderBy('users.name', 'asc') 
-            ->get();
+        $todayPatients = $this->fetchAppointmentRows($doctorId, 'today', $today);
+        $upcomingPatients = $this->fetchAppointmentRows($doctorId, 'upcoming', $today);
 
-        return view('doctor.patients.index', compact('patients'));
+        return view('doctor.patients.index', compact('todayPatients', 'upcomingPatients'));
     }
 
-    // get specific patient
-    public function getPatient($uuid){
-        $doctorId = Session::get('user_id');
-
-        $patient = DB::table('users')
-            ->join('appointments', 'users.id', '=', 'appointments.patient_id')
-            ->leftJoin('patient_profiles', 'users.id', '=', 'patient_profiles.user_id')
-            ->where('users.uuid', $uuid)
-            ->where('appointments.doctor_id', $doctorId)
-            ->select(
-                // user data
-                'users.uuid', 
-                'users.name', 
-                'users.email', 
-                'users.phone', 
-                'users.gender', 
-                'users.avatar_url',
-                'users.created_at',
-                
-                // detailed patient profile
-                'patient_profiles.date_of_birth',
-                'patient_profiles.blood_type',
-                'patient_profiles.height_cm',
-                'patient_profiles.weight_kg',
-                'patient_profiles.allergies',
-                'patient_profiles.chronic_conditions',
-                'patient_profiles.emergency_contact_name',
-                'patient_profiles.emergency_contact_phone'
-            )
-            ->first();
-
-        if (!$patient) {
-            abort(404, 'Patient not found or unauthorized access.');
-        }
-
-        // decode JSON to php array
-        if ($patient->allergies) {
-            $patient->allergies = json_decode($patient->allergies);
-        }
-        if ($patient->chronic_conditions) {
-            $patient->chronic_conditions = json_decode($patient->chronic_conditions);
-        }
-
-        return view('doctor.patients.show', compact('patient'));
-    }
-
-    // get patient all record from session doctor
-    public function getPatientRecords($uuid)
+    public function updateEncounter(Request $request, string $uuid)
     {
         $doctorId = Session::get('user_id');
 
-        $patient = DB::table('users')
-            ->where('uuid', $uuid)
-            ->where('role', 'patient')
-            ->first();
-
-        if (!$patient) {
-            abort(404, 'Patient not found.');
-        }
-
-        // 2. Fetch the summary records
-        $records = DB::table('medical_records')
-            ->where('patient_id', $patient->id)
-            ->where('doctor_id', $doctorId) 
-            ->select(
-                'uuid',
-                'patient_id',
-                'doctor_id',
-                'appointment_id',
-                'record_date',
-                'chief_complaint',
-                'diagnosis'
-            )
-            ->orderBy('record_date', 'desc')
-            ->get();
-
-        return view('doctor.records.index', compact('records', 'patient'));
-    }
-
-    // specific record
-    public function getPatientRecord($uuid){
-        $doctorId = Session::get('user_id');
-
-        $record = DB::table('medical_records')
+        $appointment = DB::table('appointments')
             ->where('uuid', $uuid)
             ->where('doctor_id', $doctorId)
             ->first();
 
-        if (!$record) {
-            abort(404, 'Medical record not found or unauthorized access.');
+        if (!$appointment) {
+            abort(404, 'Appointment not found.');
         }
 
-        // decode JSON arrays to PHP arrays
-        if ($record->vitals) {
-            $record->vitals = json_decode($record->vitals);
-        }
-        if ($record->attachments) {
-            $record->attachments = json_decode($record->attachments);
-        }
-
-        // fetch all prescriptions of the record
-        $prescriptions = DB::table('prescriptions')
-            ->where('medical_record_id', $record->id)
-            ->orderBy('issued_at', 'desc')
-            ->get();
-
-        // attach prescription to record
-        $record->prescriptions = $prescriptions;
-
-        return view('doctor.records.show', compact('record'));
-    }
-
-    // create specific patient record
-    public function createPatientRecord(Request $request, $uuid){
-        $doctorId = Session::get('user_id');
-
-        $patient = DB::table('users')
-            ->where('uuid', $uuid)
-            ->where('role', 'patient')
-            ->first();
-
-        if (!$patient) {
-            abort(404, 'Patient not found.');
-        }
-        //we pass the value to validated so it will go thru even if not all are validated
         $validated = $request->validate([
-            // medical records
-            'appointment_id'  => 'nullable|exists:appointments,id',
-            'record_date'     => 'required|date',
-            'chief_complaint' => 'nullable|string',
-            'diagnosis'       => 'nullable|string',
-            'notes'           => 'nullable|string',
-            
-            // JSON Fields (Frontend sends them as arrays/objects)
-            'vitals'          => 'nullable|array',
-            'attachments'     => 'nullable|array',
-
-            // Prescriptions 
-            'prescriptions'                  => 'nullable|array',
-            'prescriptions.*.drug_name'      => 'required_with:prescriptions|string|max:255',
-            'prescriptions.*.dosage'         => 'required_with:prescriptions|string|max:100',
-            'prescriptions.*.frequency'      => 'required_with:prescriptions|string|max:100',
-            'prescriptions.*.duration'       => 'nullable|string|max:100',
-            'prescriptions.*.instructions'   => 'nullable|string',
-            'prescriptions.*.valid_until'    => 'nullable|date',
+            'chief_complaint' => 'nullable|string|max:1000',
+            'notes' => 'nullable|string|max:5000',
+            'drug_name' => 'nullable|string|max:255',
+            'dosage' => 'nullable|string|max:100',
         ]);
 
         try {
-            DB::transaction(function () use ($doctorId, $patient, $validated) {
-                //medical record first. then we get it's ID for later
-                $recordId = DB::table('medical_records')->insertGetId([
-                    'patient_id'      => $patient->id,
-                    'doctor_id'       => $doctorId,
-                    'appointment_id'  => $validated['appointment_id'] ?? null,
-                    'record_date'     => $validated['record_date'],
-                    'chief_complaint' => $validated['chief_complaint'] ?? null,
-                    'diagnosis'       => $validated['diagnosis'] ?? null,
-                    'notes'           => $validated['notes'] ?? null,
-                    // Convert the PHP arrays back into JSON strings for MySQL
-                    'vitals'          => isset($validated['vitals']) ? json_encode($validated['vitals']) : null,
-                    'attachments'     => isset($validated['attachments']) ? json_encode($validated['attachments']) : null,
-                ]);
+            DB::transaction(function () use ($doctorId, $appointment, $validated) {
+                $record = DB::table('medical_records')
+                    ->where('appointment_id', $appointment->id)
+                    ->first();
 
-                // B. insert all prescriptions
-                if (!empty($validated['prescriptions'])) {
-                    $prescriptionInserts = [];
-                    
-                    foreach ($validated['prescriptions'] as $rx) {
-                        $prescriptionInserts[] = [
-                            'medical_record_id' => $recordId,
-                            'patient_id'        => $patient->id, 
-                            'doctor_id'         => $doctorId,    
-                            'drug_name'         => $rx['drug_name'],
-                            'dosage'            => $rx['dosage'],
-                            'frequency'         => $rx['frequency'],
-                            'duration'          => $rx['duration'] ?? null,
-                            'instructions'      => $rx['instructions'] ?? null,
-                            'valid_until'       => $rx['valid_until'] ?? null,
-                            'status'            => 'active'
-                        ];
-                    }
-
-                    DB::table('prescriptions')->insert($prescriptionInserts);
+                if ($record) {
+                    DB::table('medical_records')->where('id', $record->id)->update([
+                        'chief_complaint' => $validated['chief_complaint'] ?? null,
+                        'notes' => $validated['notes'] ?? null,
+                        'updated_at' => now(),
+                    ]);
+                    $recordId = $record->id;
+                } else {
+                    $recordId = DB::table('medical_records')->insertGetId([
+                        'uuid' => (string) Str::uuid(),
+                        'patient_id' => $appointment->patient_id,
+                        'doctor_id' => $doctorId,
+                        'appointment_id' => $appointment->id,
+                        'record_date' => $appointment->appointment_date,
+                        'chief_complaint' => $validated['chief_complaint'] ?? null,
+                        'notes' => $validated['notes'] ?? null,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
                 }
 
-                // auto complete the linked appointment
-                if (!empty($validated['appointment_id'])) {
-                    DB::table('appointments')
-                        ->where('id', $validated['appointment_id'])
-                        ->update(['status' => 'completed']);
+                if (!empty($validated['drug_name'])) {
+                    $existingRx = DB::table('prescriptions')
+                        ->where('medical_record_id', $recordId)
+                        ->orderBy('issued_at', 'desc')
+                        ->first();
+
+                    if ($existingRx) {
+                        DB::table('prescriptions')->where('id', $existingRx->id)->update([
+                            'drug_name' => $validated['drug_name'],
+                            'dosage' => $validated['dosage'] ?? $existingRx->dosage,
+                            'updated_at' => now(),
+                        ]);
+                    } else {
+                        DB::table('prescriptions')->insert([
+                            'uuid' => (string) Str::uuid(),
+                            'medical_record_id' => $recordId,
+                            'patient_id' => $appointment->patient_id,
+                            'doctor_id' => $doctorId,
+                            'drug_name' => $validated['drug_name'],
+                            'dosage' => $validated['dosage'] ?? '—',
+                            'frequency' => 'As directed',
+                            'status' => 'active',
+                            'issued_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
                 }
             });
 
-            return redirect()->route('doctor.patient.records.index', $patient->uuid)
-                             ->with('success', 'Medical record and prescriptions successfully saved.');
-
+            return redirect()->route('doctor.patients.index')
+                ->with('success', 'Patient encounter updated successfully.');
         } catch (\Exception $e) {
             return redirect()->back()
-                             ->withErrors(['error' => 'Failed to save medical record. Please try again.'])
-                             ->withInput();
+                ->withErrors(['error' => 'Failed to update encounter. Please try again.'])
+                ->withInput();
         }
+    }
+
+    private function fetchAppointmentRows(int $doctorId, string $scope, string $today)
+    {
+        $query = DB::table('appointments')
+            ->join('users as patients', 'appointments.patient_id', '=', 'patients.id')
+            ->leftJoin('medical_records', 'medical_records.appointment_id', '=', 'appointments.id')
+            ->where('appointments.doctor_id', $doctorId)
+            ->whereIn('appointments.status', ['confirmed', 'pending', 'completed'])
+            ->select(
+                'appointments.uuid',
+                'appointments.type',
+                'appointments.start_time',
+                'appointments.end_time',
+                'appointments.appointment_date',
+                'patients.name as patient_name',
+                'medical_records.chief_complaint',
+                'medical_records.notes',
+                DB::raw('(SELECT drug_name FROM prescriptions WHERE medical_record_id = medical_records.id ORDER BY issued_at DESC LIMIT 1) as prescription_name'),
+                DB::raw('(SELECT dosage FROM prescriptions WHERE medical_record_id = medical_records.id ORDER BY issued_at DESC LIMIT 1) as prescription_dosage')
+            );
+
+        if ($scope === 'today') {
+            $query->where('appointments.appointment_date', $today)
+                ->orderBy('appointments.start_time');
+        } else {
+            $query->where('appointments.appointment_date', '>', $today)
+                ->orderBy('appointments.appointment_date')
+                ->orderBy('appointments.start_time');
+        }
+
+        return $query->get()->map(function ($row) {
+            $start = Carbon::parse($row->start_time);
+            $end = Carbon::parse($row->end_time);
+
+            return (object) [
+                'uuid' => $row->uuid,
+                'patient_name' => $row->patient_name,
+                'type_label' => $row->type === 'telemedicine' ? 'Telemedicine' : 'In Person',
+                'start_time' => $start->format('g:i A'),
+                'end_time' => $end->format('g:i A'),
+                'chief_complaint' => $row->chief_complaint,
+                'notes' => $row->notes,
+                'prescription' => $row->prescription_name
+                    ? trim($row->prescription_name . ($row->prescription_dosage ? ' ' . $row->prescription_dosage : ''))
+                    : null,
+                'drug_name' => $row->prescription_name,
+                'dosage' => $row->prescription_dosage,
+            ];
+        });
     }
 }
