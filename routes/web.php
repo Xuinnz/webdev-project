@@ -66,9 +66,9 @@ Route::middleware(['checkauth:patient'])->prefix('patient')->name('patient.')->g
     Route::get('/home', [PatientController::class, 'home'])->name('home');
 
     //appointments
-    Route::get('/appointments', [PatientAppointmentController::class, 'getPatientAppointments'])->name('appointment');
-    Route::post('/appointments/book', [AppointmentController::class, 'book'])->name('appointments.book');
-    Route::post('/appointments/cancel', [AppointmentController::class, 'cancel'])->name('appointments.cancel');
+    Route::get('/appointments', [PatientAppointmentController::class, 'getPatientAppointments'])->name('appointments');
+    Route::post('/appointments/book', [PatientAppointmentController::class, 'bookAppointment'])->name('appointments.store');
+    Route::post('/appointments/cancel', [PatientAppointmentController::class, 'cancel'])->name('appointments.cancel');
 
     //medical record
     Route::get('/medical-records', [MedicalRecordController::class, 'index'])->name('medical-records');
@@ -100,6 +100,8 @@ Route::middleware(['checkauth:doctor'])->prefix('doctor')->name('doctor.')->grou
     //PATIENTS
     Route::get('/patients', [DoctorPatientController::class, 'getPatients'])->name('patients.index');
     Route::post('/appointments/{uuid}/encounter', [DoctorPatientController::class, 'updateEncounter'])->name('appointments.encounter.update');
+    Route::post('/appointments/{uuid}/confirm', [DoctorPatientController::class, 'confirmAppointment'])->name('appointments.confirm');
+    Route::post('/appointments/{uuid}/cancel', [DoctorPatientController::class, 'cancelAppointment'])->name('appointments.cancel');
 
 });
 

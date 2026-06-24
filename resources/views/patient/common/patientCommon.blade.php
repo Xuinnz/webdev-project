@@ -26,7 +26,7 @@
                     @php
                         $links = [
                             ['label' => 'Home', 'route' => 'patient.home'],
-                            ['label' => 'Appointment', 'route' => 'patient.appointment'],
+                            ['label' => 'Appointment', 'route' => 'patient.appointments'],
                             ['label' => 'Medical Record', 'route' => 'patient.medical-records'],
                             ['label' => 'Chat', 'route' => 'patient.chat'],
                         ];

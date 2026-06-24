@@ -107,6 +107,61 @@ class PatientController extends Controller
         }
     }
 
+    public function confirmAppointment($id)
+    { 
+        $doctorId = Session::get('user_id');
+
+        // Security Check: Make sure this appointment actually belongs to the logged-in doctor
+        $appointment = DB::table('appointments')
+            ->where('id', $id)
+            ->where('doctor_id', $doctorId)
+            ->first();
+
+        if (!$appointment) {
+            return redirect()->back()->withErrors(['error' => 'Unauthorized action or appointment not found.']);
+        }
+        if ($appointment->status !== 'pending') {
+            return redirect()->back()->withErrors(['error' => 'Appointment is already confirmed or cannot be changed.']);
+        }
+
+        // Update the status to confirmed
+        DB::table('appointments')
+            ->where('id', $id)
+            ->update([
+                'status' => 'confirmed',
+                'updated_at' => now(),
+            ]);
+
+        return redirect()->route('doctor.dashboard')->with('success', 'Appointment successfully confirmed.');
+    }
+    public function cancelAppointment($id)
+    { 
+        $doctorId = Session::get('user_id');
+
+        // Security Check: Make sure this appointment actually belongs to the logged-in doctor
+        $appointment = DB::table('appointments')
+            ->where('id', $id)
+            ->where('doctor_id', $doctorId)
+            ->first();
+
+        if (!$appointment) {
+            return redirect()->back()->withErrors(['error' => 'Unauthorized action or appointment not found.']);
+        }
+        if ($appointment->status !== 'pending'){
+            return redirect()->back()->withErrors(['error' => 'Cannot cancel this appointment']);
+        }
+
+        // Update the status to confirmed
+        DB::table('appointments')
+            ->where('id', $id)
+            ->update([
+                'status' => 'cancelled',
+                'updated_at' => now(),
+            ]);
+
+        return redirect()->route('doctor.dashboard')->with('success', 'Appointment successfully confirmed.');
+    }
+
     private function fetchAppointmentRows(int $doctorId, string $scope, string $today)
     {
         $query = DB::table('appointments')

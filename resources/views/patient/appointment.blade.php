@@ -102,8 +102,20 @@
                     </p>
                 </div>
 
-                {{-- Step 2: Appointment form --}}
-                <div x-show="selectedDoctor" x-cloak>
+                {{-- Step 2: Appointment form (NOW WRAPPED IN A FORM TAG) --}}
+                <form 
+                    action="{{ route('patient.appointments.store') }}" 
+                    method="POST"
+                    x-show="selectedDoctor" 
+                    x-cloak
+                >
+                    @csrf
+                    
+                    {{-- THE BRIDGE: Hidden inputs passing Alpine variables to Laravel --}}
+                    <input type="hidden" name="doctor_id" :value="selectedDoctor?.id">
+                    <input type="hidden" name="appointment_date" :value="selectedDate">
+                    <input type="hidden" name="start_time" :value="selectedSlot">
+
                     <button type="button" class="booking-back animate-unicare-in" @click="backToDoctors()">
                         ← Back to doctors
                     </button>
@@ -136,12 +148,15 @@
 
                     <section class="booking-section animate-unicare-in stagger-3">
                         <label class="form-label" for="appointment-reason">Reason for appointment</label>
+                        {{-- ADDED: name="reason" --}}
                         <textarea
+                            name="reason"
                             id="appointment-reason"
                             class="form-textarea"
                             rows="3"
                             placeholder="Describe your symptoms or reason for visit..."
                             x-model="reason"
+                            required
                         ></textarea>
                     </section>
 
@@ -149,25 +164,25 @@
                         <p class="form-label">Type of appointment</p>
                         <div class="appointment-type-group">
                             <label class="appointment-type-option">
-                                <input type="radio" name="appointment_type" value="in_person" x-model="appointmentType">
+                                <input type="radio" name="appointment_type" value="in_person" x-model="appointmentType" required>
                                 <span>In-Person</span>
                             </label>
                             <label class="appointment-type-option">
-                                <input type="radio" name="appointment_type" value="telemedicine" x-model="appointmentType">
+                                <input type="radio" name="appointment_type" value="telemedicine" x-model="appointmentType" required>
                                 <span>Telemedicine</span>
                             </label>
                         </div>
                     </section>
 
+                    {{-- CHANGED: type="submit" and removed @click="submitBooking()" --}}
                     <button
-                        type="button"
+                        type="submit"
                         class="unicare-btn-primary booking-submit animate-unicare-in stagger-5"
                         :disabled="!canSubmit"
-                        @click="submitBooking()"
                     >
                         Confirm Appointment
                     </button>
-                </div>
+                </form>
             </div>
         </div>
 

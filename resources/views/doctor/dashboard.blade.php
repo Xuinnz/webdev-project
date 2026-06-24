@@ -6,6 +6,8 @@
     <div x-data="{
         isOpen: false,
         patient: {
+            appointment_id: '',
+            appointment_status: '',
             name: '',
             email: '',
             phone: '',
@@ -21,6 +23,8 @@
         },
         open(data) {
             this.patient = {
+                appointment_id: data.id || data.appointment_id || '',
+                appointment_status: data.status || data.appointment_status || '',
                 name: data.patient_name || '—',
                 email: data.patient_email || '—',
                 phone: data.patient_phone || '—',
@@ -127,6 +131,28 @@
                         </div>
                     </div>
                 </div>
+
+                {{-- Action Footer: Confirm / Cancel Appointment --}}
+                <div style="border-top: 1px solid rgba(0, 0, 0, 0.1); padding-top: 1.25rem; margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+                    <button type="button" class="unicare-btn-ghost" @click="close()">Close</button>
+                    
+                    {{-- Cancel Button (Shows for both pending and confirmed) --}}
+                    <template x-if="patient.appointment_status === 'pending'">
+                        <form x-bind:action="'/doctor/appointments/' + patient.appointment_id + '/cancel'" method="POST" style="margin: 0;">
+                            @csrf
+                            <button type="submit" class="unicare-btn-danger">Cancel Appointment</button>
+                        </form>
+                    </template>
+
+                    {{-- Confirm Button (Shows only for pending) --}}
+                    <template x-if="patient.appointment_status === 'pending'">
+                        <form x-bind:action="'/doctor/appointments/' + patient.appointment_id + '/confirm'" method="POST" style="margin: 0;">
+                            @csrf
+                            <button type="submit" class="unicare-btn-primary">Confirm Appointment</button>
+                        </form>
+                    </template>
+                </div>
+
             </div>
         </div>
     </div>

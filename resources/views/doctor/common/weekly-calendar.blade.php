@@ -29,7 +29,7 @@
                                     'doctor-weekly-calendar__block--upcoming' => !$appointment->is_past,
                                 ])
                                 style="top: {{ $appointment->top_percent }}%; height: {{ $appointment->height_percent }}%;"
-                                @click="open(@js($appointment))"
+                                @click="open({ ...@js($appointment), appointment_id: '{{ $appointment->id }}', appointment_status: '{{ $appointment->status }}' })"
                             >
                                 <p class="doctor-weekly-calendar__block-name">{{ $appointment->patient_name }}</p>
                                 <p class="doctor-weekly-calendar__block-type">{{ $appointment->type_label }}</p>
