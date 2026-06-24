@@ -1,4 +1,4 @@
-@extends('layouts.patientCommon')
+@extends('patient.common.patientCommon')
 
 @section('title', 'Medical Records')
 

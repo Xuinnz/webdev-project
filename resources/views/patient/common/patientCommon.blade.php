@@ -24,10 +24,10 @@
                 <nav class="unicare-nav">
                     @php
                         $links = [
-                            ['label' => 'Home', 'route' => 'home'],
-                            ['label' => 'Appointment', 'route' => 'appointments'],
-                            ['label' => 'Medical Record', 'route' => 'medical-records'],
-                            ['label' => 'Chat', 'route' => 'chat'],
+                            ['label' => 'Home', 'route' => 'patient.home'],
+                            ['label' => 'Appointment', 'route' => 'patient.appointments'],
+                            ['label' => 'Medical Record', 'route' => 'patient.medical-records'],
+                            ['label' => 'Chat', 'route' => 'patient.chat'],
                         ];
                     @endphp
 

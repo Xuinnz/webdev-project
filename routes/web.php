@@ -5,9 +5,11 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\Patient\MedicalRecordController;
+use App\Http\Controllers\Patient\PatientController;
+use App\Http\Controllers\Doctor\AppointmentController as DoctorAppointmentController;
 use App\Http\Controllers\Doctor\DoctorController as DoctorDoctorController;
 use App\Http\Controllers\Doctor\PatientController as DoctorPatientController;
-
 
 Route::get('/', function () {
     return view('welcome');
@@ -53,10 +55,23 @@ Route::group(['prefix' => 'conversations'], function() {
 //PATIENT SIDE FUNCTIONS
 Route::middleware(['checkauth:patient'])->prefix('patient')->name('patient.')->group(function (){
 
+    //dashboard
+    Route::get('/home', [PatientController::class, 'home'])->name('home');
+
+    //appointments
+    Route::get('/appointments', [AppointmentController::class, 'index'])->name('appointments');
+    Route::post('/appointments/book', [AppointmentController::class, 'book'])->name('appointments.book');
+    Route::post('/appointments/cancel', [AppointmentController::class, 'cancel'])->name('appointments.cancel');
+
+    //medical record
+    Route::get('/medical-records', [MedicalRecordController::class, 'index'])->name('medical-records');
+
+    //chat
+    Route::get('/chat', [PatientController::class, 'chat'])->name('chat');
 });
 
-//DOCTOR SIDE FUNCTIONS
 
+//DOCTOR SIDE FUNCTIONS
 
 Route::middleware(['checkauth:doctor'])->prefix('doctor')->name('doctor.')->group(function (){
     Route::get('/dashboard', [DoctorDoctorController::class, 'dashboard'])->name('dashboard');
