@@ -91,6 +91,10 @@ class AuthController extends Controller
             }
             return redirect()->route('patient.onboarding');
         }
+
+        if ($user->role === 'admin') {
+            return redirect()->route('admin.dashboard');
+        }
     }
 
     public function logout(Request $request){

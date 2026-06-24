@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\Patient\AppointmentController as PatientAppointmentController;
 use App\Http\Controllers\ChatController;
@@ -11,6 +10,8 @@ use App\Http\Controllers\Patient\PatientController;
 use App\Http\Controllers\Doctor\AppointmentController as DoctorAppointmentController;
 use App\Http\Controllers\Doctor\DoctorController as DoctorDoctorController;
 use App\Http\Controllers\Doctor\PatientController as DoctorPatientController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -92,6 +93,10 @@ Route::middleware(['checkauth:doctor'])->prefix('doctor')->name('doctor.')->grou
     //SPECIALTY 
     Route::post('/specialty', [DoctorDoctorController::class, 'addSpecialty'])->name('specialty.store');
 
+    //PROFILE
+    Route::get('/profile', [DoctorDoctorController::class, 'getProfile'])->name('profile');
+    Route::post('/profile', [DoctorDoctorController::class, 'updateProfile'])->name('profile.update');
+
     //PATIENTS
     Route::get('/patients', [DoctorPatientController::class, 'getPatients'])->name('patients.index');
     Route::post('/appointments/{uuid}/encounter', [DoctorPatientController::class, 'updateEncounter'])->name('appointments.encounter.update');
@@ -99,4 +104,16 @@ Route::middleware(['checkauth:doctor'])->prefix('doctor')->name('doctor.')->grou
 });
 
 
+
+//ADMIN SIDE FUNCTIONS
+
+Route::middleware(['checkauth:admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/dashboard', fn () => redirect()->route('admin.users.index'))->name('dashboard');
+
+    Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+    Route::get('/users/{id}/edit', [AdminUserController::class, 'edit'])->name('users.edit');
+    Route::post('/users/{id}', [AdminUserController::class, 'update'])->name('users.update');
+
+    Route::get('/roles', [AdminRoleController::class, 'index'])->name('roles.index');
+});
 
