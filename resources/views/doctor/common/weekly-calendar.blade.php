@@ -25,8 +25,8 @@
                             <div
                                 @class([
                                     'doctor-weekly-calendar__block',
-                                    'doctor-weekly-calendar__block--in-person' => $appointment->type !== 'telemedicine',
-                                    'doctor-weekly-calendar__block--telemedicine' => $appointment->type === 'telemedicine',
+                                    'doctor-weekly-calendar__block--finished' => $appointment->is_past,
+                                    'doctor-weekly-calendar__block--upcoming' => !$appointment->is_past,
                                 ])
                                 style="top: {{ $appointment->top_percent }}%; height: {{ $appointment->height_percent }}%;"
                                 @click="open(@js($appointment))"

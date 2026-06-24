@@ -59,7 +59,9 @@ class DoctorController extends Controller
 
         $dateToColumn = collect($weekDays)->pluck('column', 'date');
 
-        $calendarAppointments = $rawAppointments->map(function ($appointment) use ($dateToColumn) {
+        $now = Carbon::now();
+
+        $calendarAppointments = $rawAppointments->map(function ($appointment) use ($dateToColumn, $now) {
             $start = Carbon::parse($appointment->appointment_date . ' ' . $appointment->start_time);
             $end = Carbon::parse($appointment->appointment_date . ' ' . $appointment->end_time);
             $gridStart = $start->copy()->setTime(self::CALENDAR_START_HOUR, 0);
@@ -89,6 +91,7 @@ class DoctorController extends Controller
                 'grid_column' => $dateToColumn[$appointment->appointment_date] ?? 1,
                 'top_percent' => ($startMinutes / self::CALENDAR_TOTAL_MINUTES) * 100,
                 'height_percent' => ($duration / self::CALENDAR_TOTAL_MINUTES) * 100,
+                'is_past' => $end->lessThanOrEqualTo($now) || in_array($appointment->status, ['completed', 'no_show', 'cancelled']),
             ];
         });
 
