@@ -6,6 +6,7 @@
     <title>@yield('title', 'UNICare') — The University Hospital</title>
     <link rel="stylesheet" href="{{ asset('css/patient.css') }}">
     @vite(['resources/js/app.js'])
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
 <body x-data="pageTransitions">
     <div class="unicare-shell" :class="leaving ? 'animate-unicare-out' : ''">
@@ -25,7 +26,7 @@
                     @php
                         $links = [
                             ['label' => 'Home', 'route' => 'patient.home'],
-                            ['label' => 'Appointment', 'route' => 'patient.appointments'],
+                            ['label' => 'Appointment', 'route' => 'patient.appointment'],
                             ['label' => 'Medical Record', 'route' => 'patient.medical-records'],
                             ['label' => 'Chat', 'route' => 'patient.chat'],
                         ];
@@ -47,10 +48,13 @@
                 </nav>
             </div>
 
-            <a href="#" class="unicare-logout animate-unicare-in stagger-6">
-                <span aria-hidden="true">&#8614;</span>
-                Logout
-            </a>
+            <form action="{{ route('auth.logout') }}" method="POST">
+                @csrf
+                <button type="submit" class="unicare-logout animate-unicare-in stagger-6">
+                    <span aria-hidden="true">&#8614;</span>
+                    Logout
+                </button>
+            </form>
         </aside>
 
         <main class="unicare-main animate-unicare-in-right stagger-2">

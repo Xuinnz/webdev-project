@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AppointmentController;
+use App\Http\Controllers\Patient\AppointmentController as PatientAppointmentController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\Patient\MedicalRecordController;
 use App\Http\Controllers\Patient\PatientController;
@@ -23,8 +24,10 @@ Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 
 //SHARED FUNCTIONS
 Route::group(['prefix' => 'auth'], function(){
+    Route::get('/register', [AuthController::class, 'registerForm'])->name('auth.register.show');
     Route::post('/register', [AuthController::class, 'register'])->name('auth.register');
 
+    Route::get('login', [AuthController::class, 'showLoginForm'])->name('auth.login.show');
     
     Route::post('/login', [AuthController::class, 'login'])->name('auth.login');
 
@@ -54,12 +57,15 @@ Route::group(['prefix' => 'conversations'], function() {
 
 //PATIENT SIDE FUNCTIONS
 Route::middleware(['checkauth:patient'])->prefix('patient')->name('patient.')->group(function (){
+    //onboarding
+    Route::get('/onboarding', [PatientController::class, 'patientOnboarding'])->name('onboarding');
+    Route::post('/onboarding', [PatientController::class, 'patientOnboardingSubmit'])->name('onboarding.store');
 
     //dashboard
     Route::get('/home', [PatientController::class, 'home'])->name('home');
 
     //appointments
-    Route::get('/appointments', [AppointmentController::class, 'index'])->name('appointments');
+    Route::get('/appointments', [PatientAppointmentController::class, 'getPatientAppointments'])->name('appointment');
     Route::post('/appointments/book', [AppointmentController::class, 'book'])->name('appointments.book');
     Route::post('/appointments/cancel', [AppointmentController::class, 'cancel'])->name('appointments.cancel');
 
@@ -73,6 +79,9 @@ Route::middleware(['checkauth:patient'])->prefix('patient')->name('patient.')->g
 
 //DOCTOR SIDE FUNCTIONS
 
+
+
+// Route::prefix('doctor')->name('doctor.')->group(function (){
 Route::middleware(['checkauth:doctor'])->prefix('doctor')->name('doctor.')->group(function (){
     Route::get('/dashboard', [DoctorDoctorController::class, 'dashboard'])->name('dashboard');
 

@@ -14,6 +14,104 @@ document.addEventListener('alpine:init', () => {
             }, 200);
         },
     }));
+    
+    Alpine.data('recordDrawer', (records = []) => ({
+        open: false,
+        selected: null,
+        records: records,
+
+        show(id) {
+            this.selected = this.records.find(r => r.id === id);
+            this.open = true;
+        },
+
+        close() {
+            this.open = false;
+            setTimeout(() => { this.selected = null; }, 300);
+        }
+    }));
+
+    Alpine.data('appointmentActions', (doctors = []) => ({
+        doctors: doctors,
+        search: '',
+        showSchedule: false,
+        showCancel: false,
+        selectedDoctor: null,
+        selectedDate: null,
+        selectedSlot: null,
+        reason: '',
+        appointmentType: 'in_person',
+
+        get filteredDoctors() {
+            const q = this.search.toLowerCase();
+            return this.doctors.filter(d =>
+                d.name.toLowerCase().includes(q) ||
+                d.specialty.toLowerCase().includes(q)
+            );
+        },
+
+        get canSubmit() {
+            return this.selectedDoctor && this.selectedDate && this.selectedSlot && this.reason.trim();
+        },
+
+        openSchedule() { this.showSchedule = true; },
+        openCancel()   { this.showCancel   = true; },
+
+        closePanels() {
+            this.showSchedule = false;
+            this.showCancel   = false;
+        },
+
+        selectDoctor(doctor) {
+            this.selectedDoctor = doctor;
+        },
+
+        backToDoctors() {
+            this.selectedDoctor = null;
+            this.selectedDate   = null;
+            this.selectedSlot   = null;
+        },
+
+        isSlotSelected(date, slot) {
+            return this.selectedDate === date && this.selectedSlot === slot;
+        },
+
+        selectSlot(date, slot) {
+            this.selectedDate = date;
+            this.selectedSlot = slot;
+        },
+
+        submitBooking() {
+            if (!this.canSubmit) return;
+
+            fetch('/patient/appointments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
+                        ?? document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1],
+                },
+                body: JSON.stringify({
+                    doctor_id:        this.selectedDoctor.id,
+                    appointment_date: this.selectedDate,
+                    start_time:       this.selectedSlot,
+                    type:             this.appointmentType,
+                    reason:           this.reason,
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.message ?? 'Booking failed. Please try again.');
+                }
+            })
+            .catch(() => alert('Something went wrong.'));
+        },
+    }));
+
+
 
     Alpine.data('scheduleForm', (initialSchedules = []) => ({
         weekdays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],

@@ -52,6 +52,21 @@ class CheckAuth
                 return redirect()->route('doctor.dashboard');
             }
         }
+        if ($userRole === 'patient') {
+            $hasProfile = Session::has('profile_id');
+            $isOnboardingRoute = $request->routeIs('patient.onboarding') || $request->routeIs('patient.onboarding.store');
+
+            //if no doctor profile yet, it means the doctor is not yet completed onboarding
+            if (!$hasProfile && !$isOnboardingRoute) {
+                return redirect()->route('patient.onboarding')
+                    ->withErrors(['error' => 'Please complete your profile first.']);
+            }
+
+            //if they alr have a profile and tried to visit onboarding
+            if ($hasProfile && $isOnboardingRoute) {
+                return redirect()->route('patient.home');
+            }
+        }
         //valid request
         return $next($request);
     }

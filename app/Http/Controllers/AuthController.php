@@ -24,6 +24,10 @@ class AuthController extends Controller
     }
 
     //register (for both patient and doctor)
+
+    public function registerForm(){
+        return view('register');
+    }
     public function register(Request $request){
         $request->validate([
             'name' => 'required|string|max:255',
@@ -81,12 +85,10 @@ class AuthController extends Controller
 
         if ($user->role === 'patient') {
             $profile = DB::table('patient_profiles')->where('user_id', $user->id)->first();
-
             if ($profile) {
                 Session::put('profile_id', $profile->id);
-                return redirect()->route('patient.dashboard');
+                return redirect()->route('patient.home');
             }
-
             return redirect()->route('patient.onboarding');
         }
     }

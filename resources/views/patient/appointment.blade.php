@@ -188,11 +188,22 @@
                 <button type="button" class="action-panel-close" @click="closePanels()">×</button>
             </div>
             <p class="action-panel-text">Select the appointment you want to cancel.</p>
-            <select class="form-select">
-                <option>Dr. Santos — 3:00 PM (Confirmed)</option>
-                <option>Dr. Santos — 3:00 PM (Pending)</option>
-            </select>
-            <button type="button" class="unicare-btn-danger" @click="closePanels()">Confirm Cancel</button>
+            <form action="{{ route('patient.appointments.cancel') }}" method="POST">
+            @csrf
+                <select name="appointment_id" class="form-select mb-4" required>
+                    <option value="">Select an appointment...</option>
+                    
+                    @foreach ($appointments as $app)
+                        @if ($app['is_cancellable'])
+                            <option value="{{ $app['id'] }}">
+                                {{ $app['doctor_name'] }} — {{ $app['start_time'] }} ({{ $app['status_label'] }})
+                            </option>
+                        @endif
+                    @endforeach
+                    
+                </select>
+                <button type="submit" class="unicare-btn-danger w-full" @click="closePanels()">Confirm Cancel</button>
+            </form>
         </div>
     </div>
 @endsection
