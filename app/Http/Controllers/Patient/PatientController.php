@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
+
 class PatientController extends Controller
 {
     //
-    public function home()
+    public function dashboard()
     {
         $patientId = Session::get('user_id');
 
@@ -20,7 +22,6 @@ class PatientController extends Controller
             return redirect()->route('login');
         }
 
-        // --- 1. Fetch Appointments ---
         $appointmentsData = DB::table('appointments')
             ->join('users', 'appointments.doctor_id', '=', 'users.id')
             ->where('appointments.patient_id', $patientId)
@@ -49,7 +50,6 @@ class PatientController extends Controller
             ];
         })->toArray();
 
-        // --- 2. Fetch Messages ---
         $messagesData = DB::table('messages')
             ->join('conversations', 'messages.conversation_id', '=', 'conversations.id')
             ->join('users', 'messages.sender_id', '=', 'users.id')
@@ -69,40 +69,40 @@ class PatientController extends Controller
             ];
         })->toArray();
 
-        // --- 3. Build the Dynamic Calendar ---
-        $now = \Carbon\Carbon::now();
-        $startOfCalendar = $now->copy()->startOfMonth()->startOfWeek(\Carbon\Carbon::MONDAY);
-        $endOfCalendar   = $now->copy()->endOfMonth()->endOfWeek(\Carbon\Carbon::SUNDAY);
+    $now = Carbon::now('Asia/Manila');
         
-        $calendarWeeks = [];
-        $currentDay = $startOfCalendar->copy();
-
-        while ($currentDay <= $endOfCalendar) {
-            $weekDays = [];
-            $weekNumber = $currentDay->weekOfYear;
-
-            for ($i = 0; $i < 7; $i++) {
-                $weekDays[] = [
-                    'date'     => $currentDay->copy(),
-                    'in_month' => $currentDay->month === $now->month,
-                    'is_today' => $currentDay->isToday(),
-                ];
-                $currentDay->addDay();
-            }
-
-            $calendarWeeks[] = [
-                'number' => $weekNumber,
-                'days'   => $weekDays,
-            ];
-        }
+        $startOfMonth = $now->copy()->startOfMonth();
+        $startDate = $startOfMonth->copy()->startOfWeek(Carbon::MONDAY); 
+        $endDate = $now->copy()->endOfMonth()->endOfWeek(Carbon::SUNDAY);
 
         $calendar = [
-            'label' => $now->format('F Y'), // e.g., "June 2026"
-            'weeks' => $calendarWeeks,
+            'label' => $now->format('F Y'),
+            'weeks' => []
         ];
 
-        // --- 4. Return everything to the view ---
-        return view('patient.home', [
+        $currentDate = $startDate->copy();
+
+        while ($currentDate <= $endDate) {
+            $week = [
+                'number' => $currentDate->weekOfYear,
+                'days' => []
+            ];
+
+            for ($i = 0; $i < 7; $i++) {
+                $week['days'][] = [
+                    'date' => $currentDate->copy(),
+                    'in_month' => $currentDate->month === $now->month,
+                    // Check if this specific day matches today's date
+                    'is_today' => $currentDate->isSameDay(\Carbon\Carbon::now('Asia/Manila')),
+                ];
+                $currentDate->addDay();
+            }
+
+            $calendar['weeks'][] = $week;
+        }
+        // dd($calendar['weeks'][3]['days'][3]);
+
+        return view('patient.dashboard', [
             'userName'     => $patient->name,
             'notification' => 'You have ' . count($appointments) . ' upcoming appointments.',
             'appointments' => $appointments,
@@ -168,7 +168,7 @@ class PatientController extends Controller
                 Session::put('profile_id', $profileId);
             });
 
-            return redirect()->route('patient.home')->with('success', 'Your medical profile has been successfully set up.');
+            return redirect()->route('patient.dashboard')->with('success', 'Your medical profile has been successfully set up.');
 
         } catch (\Exception $e) {
             return redirect()->back()
@@ -177,6 +177,42 @@ class PatientController extends Controller
         }
     }
 
+    public function calendar()
+    {
+        $now = Carbon::now('Asia/Manila');
+        
+        $startOfMonth = $now->copy()->startOfMonth();
+        $startDate = $startOfMonth->copy()->startOfWeek(Carbon::MONDAY); 
+        $endDate = $now->copy()->endOfMonth()->endOfWeek(Carbon::SUNDAY);
+
+        $calendar = [
+            'label' => $now->format('F Y'),
+            'weeks' => []
+        ];
+
+        $currentDate = $startDate->copy();
+
+        while ($currentDate <= $endDate) {
+            $week = [
+                'number' => $currentDate->weekOfYear,
+                'days' => []
+            ];
+
+            for ($i = 0; $i < 7; $i++) {
+                $week['days'][] = [
+                    'date' => $currentDate->copy(),
+                    'in_month' => $currentDate->month === $now->month,
+                    // Check if this specific day matches today's date
+                    'is_today' => $currentDate->isSameDay(\Carbon\Carbon::now('Asia/Manila')),
+                ];
+                $currentDate->addDay();
+            }
+
+            $calendar['weeks'][] = $week;
+        }
+
+        return view('patient.dashboard', compact('calendar'));
+    }
 
     private function generateCalendarMatrix(){
         $currentMonth = date('m');
@@ -213,5 +249,82 @@ class PatientController extends Controller
             'label' => date('F Y'),
             'weeks' => $weeks,
         ];
+    }
+
+    public function getProfile()
+    {
+        $userId = Session::get('user_id');
+        
+        $profile = DB::table('users')
+            ->where('users.id', $userId)
+            ->leftJoin('patient_profiles', 'users.id', '=', 'patient_profiles.user_id')
+            ->select(
+                'users.id',
+                'users.name',
+                'users.email',
+                'users.phone',
+                'users.gender',
+                'users.avatar_url',
+                'patient_profiles.date_of_birth',
+                'patient_profiles.blood_type',
+                'patient_profiles.height_cm',
+                'patient_profiles.weight_kg',
+                'patient_profiles.emergency_contact_name',
+                'patient_profiles.emergency_contact_phone'
+            )
+            ->first();
+
+        $specialties = DB::table('specialties')->orderBy('name')->get();
+
+        return view('patient.profile', compact('profile', 'specialties'));
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $userId = Session::get('user_id');
+        
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'required|string|max:20',
+            'gender' => 'required|in:male,female,other',
+            'avatar_url' => 'nullable|url|max:500',
+            
+            'date_of_birth' => 'nullable|date',
+            'blood_type' => 'nullable|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
+            'height_cm' => 'nullable|numeric|min:0|max:300',
+            'weight_kg' => 'nullable|numeric|min:0|max:500',
+            'emergency_contact_name' => 'nullable|string|max:255',
+            'emergency_contact_phone' => 'nullable|string|max:20',
+        ]);
+
+        try {
+            DB::transaction(function () use ($userId, $validated) {
+                DB::table('users')->where('id', $userId)->update([
+                    'name' => $validated['name'],
+                    'phone' => $validated['phone'],
+                    'gender' => $validated['gender'],
+                    'avatar_url' => $validated['avatar_url'] ?? null,
+                ]);
+
+                DB::table('patient_profiles')->updateOrInsert(
+                    ['user_id' => $userId],
+                    [
+                        'date_of_birth' => $validated['date_of_birth'] ?? null,
+                        'blood_type' => $validated['blood_type'] ?? null,
+                        'height_cm' => $validated['height_cm'] ?? null,
+                        'weight_kg' => $validated['weight_kg'] ?? null,
+                        'emergency_contact_name' => $validated['emergency_contact_name'] ?? null,
+                        'emergency_contact_phone' => $validated['emergency_contact_phone'] ?? null,
+                        'updated_at' => \Carbon\Carbon::now(),
+                    ]
+                );
+            });
+
+            return redirect()->back()->with('success', 'Your profile has been successfully updated.');
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->withErrors(['error' => 'Failed to update profile. Please try again.'])
+                ->withInput();
+        }
     }
 }

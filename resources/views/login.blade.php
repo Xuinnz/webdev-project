@@ -7,39 +7,35 @@
     <link rel="stylesheet" href="{{ asset('css/patient.css') }}">
 
      <style>
-        /* Ensures the main container takes full viewport height and manages its children as flex items */
         .login-shell {
-            display: flex; /* Make it a flex container */
+            display: flex; 
             min-height: 100vh;
-            width: 100vw; /* Ensure it takes full viewport width */
-            overflow: hidden; /* Prevents horizontal scroll if children overflow */
+            width: 100vw; 
+            overflow: hidden;
         }
 
-        /* Styles for the left hero section containing the image */
         .login-hero {
-            flex: 3; /* Allocates 3 parts of the available space */
+            flex: 3;
             display: flex;
-            align-items: flex-end; /* Aligns the image element to the bottom of this container */
-            justify-content: center; /* Centers the image element horizontally within its column */
-            overflow: hidden; /* Crucial: Clips any part of the image *element* that goes outside its bounds, without distorting the image content */
-            position: relative; /* Allows for positioning children if needed */
+            align-items: flex-end; 
+            justify-content: center; 
+            overflow: hidden; 
+            position: relative;
             margin-left: -10%;
         }
 
-        /* Styles for the image itself */
         .login-pylon {
-            width: auto; /* Let width be determined by height to maintain aspect ratio */
-            height: 130%; /* Make the image element significantly taller than its container */
-            max-width: none; /* Override any max-width that might be inherited and constrain it */
-            object-fit: contain; /* CRUCIAL: Ensures the entire image content is visible within its element, scaling it without cropping */
-            margin-bottom: -5%; 
-            margin-right: 30%; /* Optional: Adjusts horizontal positioning if needed */
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            width: 100%;
+            height: 150vh;
+            margin-bottom: -5%;
+            margin-left: -15%;
         }
 
-        /* Styles for the right panel containing the login form */
         .login-panel {
-            flex: 2; /* Allocates 2 parts of the available space */
-            /* Add any other specific styles for the login-panel if necessary */
+            flex: 2;
         }
     </style>
 </head>
@@ -50,8 +46,7 @@
                 src="{{ asset('images/pup-pylon.png') }}"
                 alt=""
                 class="login-pylon"
-                style="position:fixed top:0 bottom:0 border:none width:100% height:300px transform:scale(2)"
-            >
+                >
         </aside>
 
         <main class="login-panel">

@@ -64,7 +64,7 @@ class CheckAuth
 
             //if they alr have a profile and tried to visit onboarding
             if ($hasProfile && $isOnboardingRoute) {
-                return redirect()->route('patient.home');
+                return redirect()->route('patient.dashboard');
             }
         }
         //valid request

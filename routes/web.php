@@ -63,8 +63,8 @@ Route::middleware(['checkauth:patient'])->prefix('patient')->name('patient.')->g
     Route::post('/onboarding', [PatientController::class, 'patientOnboardingSubmit'])->name('onboarding.store');
 
     //dashboard
-    Route::get('/home', [PatientController::class, 'home'])->name('home');
-
+    Route::get('/dashboard', [PatientController::class, 'dashboard'])->name('dashboard');
+    
     //appointments
     Route::get('/appointments', [PatientAppointmentController::class, 'getPatientAppointments'])->name('appointment');
     Route::post('/appointments/book', [AppointmentController::class, 'book'])->name('appointments.book');
@@ -73,8 +73,10 @@ Route::middleware(['checkauth:patient'])->prefix('patient')->name('patient.')->g
     //medical record
     Route::get('/medical-records', [MedicalRecordController::class, 'index'])->name('medical-records');
 
-    //chat
-    Route::get('/chat', [PatientController::class, 'chat'])->name('chat');
+    //profile
+    Route::get('/profile', [PatientController::class, 'getProfile'])->name('profile');
+    Route::post('/profile', [PatientController::class, 'updateProfile'])->name('profile.update');
+
 });
 
 
