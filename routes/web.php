@@ -9,6 +9,8 @@ use App\Http\Controllers\Patient\PatientController;
 use App\Http\Controllers\Doctor\AppointmentController as DoctorAppointmentController;
 use App\Http\Controllers\Doctor\DoctorController as DoctorDoctorController;
 use App\Http\Controllers\Doctor\PatientController as DoctorPatientController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -93,4 +95,16 @@ Route::middleware(['checkauth:doctor'])->prefix('doctor')->name('doctor.')->grou
 });
 
 
+
+//ADMIN SIDE FUNCTIONS
+
+Route::middleware(['checkauth:admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/dashboard', fn () => redirect()->route('admin.users.index'))->name('dashboard');
+
+    Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+    Route::get('/users/{id}/edit', [AdminUserController::class, 'edit'])->name('users.edit');
+    Route::post('/users/{id}', [AdminUserController::class, 'update'])->name('users.update');
+
+    Route::get('/roles', [AdminRoleController::class, 'index'])->name('roles.index');
+});
 
