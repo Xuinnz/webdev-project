@@ -3,8 +3,12 @@
 @section('title', 'Onboarding')
 
 @section('content')
-<h1 class="page-title animate-unicare-in stagger-1">Complete Your Profile</h1>
-<p class="mb-6 opacity-75 animate-unicare-in stagger-2">Set up your doctor profile and weekly schedule to get started.</p>
+<div class="unicare-brand animate-unicare-in stagger-1" style="margin-bottom: 2rem;">
+    <div>
+        <h1 class="page-title" style="margin-bottom: 0.5rem;">Complete Your Profile</h1>
+        <p class="opacity-75" style="margin: 0; font-size: 1rem;">Set up your doctor profile and weekly schedule to get started.</p>
+    </div>
+</div>
 
 <form
     action="{{ route('doctor.onboarding.store') }}"
@@ -108,7 +112,7 @@
 
         @error('schedules')<p class="text-red-600 text-sm mb-3">{{ $message }}</p>@enderror
 
-        <div class="grid grid-cols-7 gap-2 mb-6">
+        <div class="grid grid-cols-7 gap-3 mb-10">
             <template x-for="day in days" :key="day.weekday">
                 <button
                     type="button"
@@ -134,14 +138,13 @@
                     </div>
                 </div>
 
-                <div class="flex flex-wrap gap-2">
+                <div class="flex flex-wrap gap-x-3 gap-y-4">
                     <template x-for="slot in visibleSlots" :key="slot.start">
                         <button
                             type="button"
-                            class="px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-200"
                             :class="isSlotSelected(day.weekday, slot.start)
-                                ? 'bg-blue-600 border-blue-500 text-white shadow-md shadow-blue-500/20'
-                                : 'bg-transparent border-gray-600/60 text-gray-300 opacity-80 hover:opacity-100 hover:bg-white/10 hover:border-gray-400'"
+                                ? 'schedule-slot schedule-slot--active'
+                                : 'schedule-slot'"
                             @click="toggleSlot(day.weekday, slot.start)"
                             x-text="slot.start"
                         ></button>
@@ -168,8 +171,8 @@
 </form>
 
 <details class="glass-panel glass-panel--padded mt-8 animate-unicare-in stagger-4">
-    <summary class="cursor-pointer font-medium">Add a new specialty</summary>
-    <form action="{{ route('doctor.specialty.store') }}" method="POST" class="mt-4">
+    <summary class="cursor-pointer section-title" style="margin: 0; user-select: none;">Add a new specialty</summary>
+    <form action="{{ route('doctor.specialty.store') }}" method="POST" class="mt-4 pt-4" style="border-top: 1px solid rgba(0,0,0,0.1);">
         @csrf
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>

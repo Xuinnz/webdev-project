@@ -307,6 +307,7 @@ class PatientController extends Controller
                 'appointments.id',
                 'appointments.uuid',
                 'appointments.type',
+                'appointments.status',
                 'appointments.start_time',
                 'appointments.end_time',
                 'appointments.appointment_date',
@@ -355,6 +356,8 @@ class PatientController extends Controller
  
             return (object) [
                 'uuid'                 => $row->uuid,
+                'status'               => $row->status,
+                'date_formatted'       => Carbon::parse($row->appointment_date)->format('M d'),
                 'patient_name'         => $row->patient_name,
                 'type_label'           => $row->type === 'telemedicine' ? 'Telemedicine' : 'In Person',
                 'start_time'           => Carbon::parse($row->start_time)->format('g:i A'),

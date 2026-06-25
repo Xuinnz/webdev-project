@@ -93,7 +93,9 @@ textarea {
     justify-content: center;
     border-radius: 0.5rem;
     background: rgba(255, 255, 255, 0.1);
-} img  {
+}
+
+img {
     height: inherit;
     width: inherit;
 }
@@ -774,6 +776,7 @@ textarea {
         opacity: 0;
         transform: translateY(18px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -785,6 +788,7 @@ textarea {
         opacity: 0;
         transform: translateX(24px);
     }
+
     to {
         opacity: 1;
         transform: translateX(0);
@@ -796,6 +800,7 @@ textarea {
         opacity: 0;
         transform: translateX(-24px);
     }
+
     to {
         opacity: 1;
         transform: translateX(0);
@@ -807,6 +812,7 @@ textarea {
         opacity: 0;
         transform: scale(0.96);
     }
+
     to {
         opacity: 1;
         transform: scale(1);
@@ -818,6 +824,7 @@ textarea {
         opacity: 1;
         transform: translateY(0);
     }
+
     to {
         opacity: 0;
         transform: translateY(12px);
@@ -844,14 +851,37 @@ textarea {
     animation: unicare-fade-out-down 0.35s ease both;
 }
 
-.stagger-1 { animation-delay: 0.05s; }
-.stagger-2 { animation-delay: 0.12s; }
-.stagger-3 { animation-delay: 0.19s; }
-.stagger-4 { animation-delay: 0.26s; }
-.stagger-5 { animation-delay: 0.33s; }
-.stagger-6 { animation-delay: 0.4s; }
-.stagger-7 { animation-delay: 0.47s; }
-.stagger-8 { animation-delay: 0.54s; }
+.stagger-1 {
+    animation-delay: 0.05s;
+}
+
+.stagger-2 {
+    animation-delay: 0.12s;
+}
+
+.stagger-3 {
+    animation-delay: 0.19s;
+}
+
+.stagger-4 {
+    animation-delay: 0.26s;
+}
+
+.stagger-5 {
+    animation-delay: 0.33s;
+}
+
+.stagger-6 {
+    animation-delay: 0.4s;
+}
+
+.stagger-7 {
+    animation-delay: 0.47s;
+}
+
+.stagger-8 {
+    animation-delay: 0.54s;
+}
 
 [x-cloak] {
     display: none !important;
@@ -1407,13 +1437,11 @@ textarea {
     gap: 0.25rem;
     position: relative;
     border-top: 1px solid rgba(0, 0, 0, 0.08);
-    background-image: repeating-linear-gradient(
-        to bottom,
-        rgba(0, 0, 0, 0.06) 0,
-        rgba(0, 0, 0, 0.06) 1px,
-        transparent 1px,
-        transparent 3rem
-    );
+    background-image: repeating-linear-gradient(to bottom,
+            rgba(0, 0, 0, 0.06) 0,
+            rgba(0, 0, 0, 0.06) 1px,
+            transparent 1px,
+            transparent 3rem);
     min-height: 27rem;
 }
 
@@ -1483,13 +1511,18 @@ textarea {
     font-size: 0.875rem;
 }
 
-.doctor-patients-table--dark th,
-.doctor-patients-table--dark td {
-    color: #fff;
+.unicare-table.doctor-patients-table--dark thead th,
+.unicare-table.doctor-patients-table--dark tbody td {
+    color: #ffffff;
 }
 
-.doctor-patients-table--dark th {
+.unicare-table.doctor-patients-table--dark thead th {
     color: rgba(255, 255, 255, 0.85);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.unicare-table.doctor-patients-table--dark tbody tr:hover {
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .doctor-edit-btn {
@@ -1529,5 +1562,93 @@ textarea {
     width: 100%;
     max-width: 32rem;
     background: var(--unicare-panel);
+    border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
+/* Custom Modal Close Button */
+.doctor-encounter-modal__close {
+    position: absolute;
+    top: 1rem;
+    right: 1.25rem;
+    background: transparent;
+    border: none;
+    font-size: 1.75rem;
+    line-height: 1;
+    color: var(--text-faint);
+    cursor: pointer;
+    transition: color 0.2s ease, transform 0.2s ease;
+    padding: 0.25rem;
+}
+
+.doctor-encounter-modal__close:hover {
+    color: var(--unicare-red);
+    transform: scale(1.1);
+}
+
+/* Schedule Slot Buttons (Onboarding + Profile) */
+.schedule-slot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.schedule-slot:hover {
+    background: rgba(109, 140, 184, 0.1);
+    color: var(--unicare-blue);
+    border-color: rgba(109, 140, 184, 0.3);
+}
+
+.schedule-slot--active {
+    background: var(--unicare-blue);
+    color: #fff;
+    border-color: var(--unicare-blue);
+}
+
+/* Unicare Ghost Button */
+.unicare-btn-ghost {
+    background: transparent;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    color: var(--text-muted);
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.unicare-btn-ghost:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-primary);
+}
+
+/* Encounter Prescription Row */
+.encounter-rx-row {
+    background: rgba(196, 208, 232, 0.35);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid rgba(109, 140, 184, 0.2);
+}
+
+/* Upcoming Patients Date Badge */
+.up-date-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem 0.6rem;
+    border-radius: 0.375rem;
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+}

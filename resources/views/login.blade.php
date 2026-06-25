@@ -18,20 +18,19 @@
             flex: 3;
             display: flex;
             align-items: flex-end; 
-            justify-content: center; 
+            justify-content: flex-start; 
             overflow: hidden; 
             position: relative;
-            margin-left: -10%;
         }
 
         .login-pylon {
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            width: 100%;
-            height: 150vh;
-            margin-bottom: -5%;
-            margin-left: -15%;
+            height: 90%;
+            width: auto;
+            object-fit: contain;
+            margin-bottom: -10%;
+            margin-left: -10%;
+            transform: scale(1.15);
+            transform-origin: bottom left;
         }
 
         .login-panel {

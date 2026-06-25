@@ -28,7 +28,10 @@
                     <tbody>
                         @foreach ($todayPatients as $index => $row)
                             <tr class="animate-unicare-in stagger-{{ min($index + 1, 8) }}">
-                                <td>{{ $row->patient_name }}</td>
+                                <td>
+                                    {{ $row->patient_name }}
+                                    <span class="text-[0.65rem] px-2 py-0.5 ml-2 rounded-full font-semibold {{ $row->status === 'confirmed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">{{ strtoupper($row->status) }}</span>
+                                </td>
                                 <td>{{ $row->type_label }}</td>
                                 <td>{{ $row->start_time }}</td>
                                 <td>{{ $row->end_time }}</td>
@@ -78,7 +81,10 @@
                     <tbody>
                         @foreach ($upcomingPatients as $index => $row)
                             <tr class="animate-unicare-in stagger-{{ min($index + 1, 8) }}">
-                                <td>{{ $row->patient_name }}</td>
+                                <td>
+                                    <span class="up-date-badge mr-2">{{ $row->date_formatted }}</span>
+                                    {{ $row->patient_name }}
+                                </td>
                                 <td>{{ $row->type_label }}</td>
                                 <td>{{ $row->start_time }}</td>
                                 <td>{{ $row->end_time }}</td>
@@ -171,7 +177,8 @@
                     <div class="flex items-center justify-between mb-3">
                         <p class="form-label mb-0">Prescriptions</p>
                         <button type="button"
-                            class="text-xs underline opacity-60 hover:opacity-100"
+                            class="unicare-btn-ghost text-xs py-1 px-3"
+                            style="margin-top: 0.25rem; margin-bottom: 0.25rem;"
                             @click="addRx()">+ Add drug</button>
                     </div>
 
@@ -218,7 +225,8 @@
                             </div>
                             <button
                                 type="button"
-                                class="text-xs text-red-500 underline mt-2 hover:text-red-700"
+                                class="unicare-btn-danger px-3 py-1 text-xs"
+                                style="margin-top: 0.75rem; margin-bottom: 0.75rem;"
                                 x-show="prescriptions.length > 1"
                                 @click="removeRx(i)"
                             >Remove</button>
@@ -261,13 +269,6 @@
     max-width: 56rem;
     max-height: 90vh;
     overflow-y: auto;
-}
-.encounter-rx-row {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 0.5rem;
-    padding: 1rem;
-    margin-bottom: 0.75rem;
 }
 </style>
 @endsection

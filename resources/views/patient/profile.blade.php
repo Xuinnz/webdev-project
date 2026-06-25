@@ -89,6 +89,6 @@
             @error('avatar_url')<p class="text-red-600 text-sm mt-1">{{ $message }}</p>@enderror
         </div>
         
-            <button type="submit" class="unicare-btn-primary">Save Profile</button>
+            <button type="submit" class="unicare-btn-primary" style="margin-top: 1rem;">Save Profile</button>
     </form>
 @endsection
