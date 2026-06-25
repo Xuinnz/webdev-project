@@ -94,7 +94,6 @@ class PatientController extends Controller
                 $week['days'][] = [
                     'date' => $currentDate->copy(),
                     'in_month' => $currentDate->month === $now->month,
-                    // Check if this specific day matches today's date
                     'is_today' => $currentDate->isSameDay(\Carbon\Carbon::now('Asia/Manila')),
                 ];
                 $currentDate->addDay();
@@ -204,7 +203,6 @@ class PatientController extends Controller
                 $week['days'][] = [
                     'date' => $currentDate->copy(),
                     'in_month' => $currentDate->month === $now->month,
-                    // Check if this specific day matches today's date
                     'is_today' => $currentDate->isSameDay(\Carbon\Carbon::now('Asia/Manila')),
                 ];
                 $currentDate->addDay();

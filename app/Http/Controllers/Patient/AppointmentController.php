@@ -76,7 +76,6 @@ class AppointmentController extends Controller
     {
         $patientId = Session::get('user_id');
 
-        // --- 1. Fetch the Patient's Appointments ---
         $rawAppointments = DB::table('appointments')
             ->join('users as doctors', 'appointments.doctor_id', '=', 'doctors.id')
             ->where('appointments.patient_id', $patientId)
@@ -104,7 +103,6 @@ class AppointmentController extends Controller
             ];
         })->toArray();
 
-        // --- 2. Fetch the Doctor Directory ---
         $rawDoctors = DB::table('users')
             ->join('doctor_profiles', 'users.id', '=', 'doctor_profiles.user_id')
             ->join('specialties', 'doctor_profiles.specialty_id', '=', 'specialties.id')
@@ -114,43 +112,36 @@ class AppointmentController extends Controller
                 'users.name', 
                 'specialties.name as specialty', 
                 'doctor_profiles.bio',
-                'doctor_profiles.slot_duration_minutes' // CRITICAL: We need to know their interval!
+                'doctor_profiles.slot_duration_minutes'
             )
             ->get();
 
-        // --- PRE-FETCH DATA TO PREVENT N+1 QUERY CRASH ---
-        $startDate = \Carbon\Carbon::now()->addDay()->toDateString(); // Start tomorrow
+        $startDate = \Carbon\Carbon::now()->addDay()->toDateString(); 
         $endDate   = \Carbon\Carbon::now()->addDays(7)->toDateString();
 
-        // Grab ALL schedules in one query
         $allSchedules = DB::table('doctor_schedules')->get()->groupBy('doctor_id');
 
-        // Grab ALL active appointments in the next 7 days in one query
         $allBookings = DB::table('appointments')
             ->whereBetween('appointment_date', [$startDate, $endDate])
             ->whereIn('status', ['pending', 'confirmed'])
             ->get()
             ->groupBy(function($app) {
-                // Group by Doctor AND Date so we can find them instantly
                 return $app->doctor_id . '_' . $app->appointment_date; 
             });
 
-        // --- 3. Generate the 7-Day Availability Structure ---
         $doctors = $rawDoctors->map(function ($doc) use ($allSchedules, $allBookings) {
             $availability = [];
-            $duration = $doc->slot_duration_minutes ?? 30; // Fallback just in case
+            $duration = $doc->slot_duration_minutes ?? 30; 
             
             for ($i = 1; $i <= 7; $i++) {
                 $dateObj = \Carbon\Carbon::now()->addDays($i);
                 $dateStr = $dateObj->toDateString();
-                $weekday = $dateObj->dayOfWeek; // 0 (Sun) to 6 (Sat)
+                $weekday = $dateObj->dayOfWeek; 
                 
-                // A. Find Master Mask
                 $docSchedules = $allSchedules->get($doc->id) ?? collect();
                 $daySchedule  = $docSchedules->firstWhere('weekday', $weekday);
                 $masterMask   = $daySchedule ? (int) $daySchedule->slot_mask : 0;
 
-                // B. Find Booked Mask
                 $bookedMask = 0;
                 $dailyBookings = $allBookings->get($doc->id . '_' . $dateStr) ?? collect();
                 
@@ -160,10 +151,8 @@ class AppointmentController extends Controller
                     ]);
                 }
 
-                // C. The Bitwise Engine: Master AND NOT Booked
                 $availableMask = $masterMask & ~$bookedMask;
 
-                // D. Decode the remaining binary into actual time buttons for Alpine!
                 $slots = [];
                 if ($availableMask > 0) {
                     $slots = $this->decodeMaskToSlots($availableMask, $duration);
@@ -186,52 +175,44 @@ class AppointmentController extends Controller
             ];
         })->toArray();
 
-        // --- 4. Return the View ---
         return view('patient.appointment', compact('appointments', 'doctors'));
     }
 
     public function isSlotAvailable($doctorId, $date, $startTime, $durationMinutes)
     {
-        // 1. Get the doctor's base schedule for this day of the week (0 = Sunday, 1 = Monday, etc.)
         $dayOfWeek = date('w', strtotime($date));
         $schedule = DB::table('doctor_schedules')
             ->where('doctor_id', $doctorId)
             ->where('weekday', $dayOfWeek)
             ->first();
 
-        // If no schedule exists, or the mask is 0, the doctor isn't working today.
         if (!$schedule || $schedule->slot_mask == 0) {
             return false; 
         }
 
         $masterMask = (int) $schedule->slot_mask;
 
-        // 2. Build the Booked Mask from existing appointments on this specific date
         $bookedAppointments = DB::table('appointments')
             ->where('doctor_id', $doctorId)
             ->where('appointment_date', $date)
-            ->whereIn('status', ['pending', 'confirmed']) // Ignore cancelled appointments!
+            ->whereIn('status', ['pending', 'confirmed']) 
             ->get();
 
         $bookedMask = 0;
         foreach ($bookedAppointments as $appt) {
-            // Reuse your existing helper to convert the saved times back into a mask
             $apptMask = $this->calculateSlotMask([
                 ['start' => $appt->start_time, 'end' => $appt->end_time]
             ]);
-            $bookedMask = $bookedMask | $apptMask; // Merge it into the booked pool
+            $bookedMask = $bookedMask | $apptMask; 
         }
 
-        // 3. Calculate Actual Available Time (Master AND NOT Booked)
         $availableMask = $masterMask & ~$bookedMask;
 
-        // 4. Calculate the mask for what the patient actually requested
         $requestedEndTime = date('H:i:s', strtotime($startTime . " + $durationMinutes minutes"));
         $requestedMask = $this->calculateSlotMask([
             ['start' => $startTime, 'end' => $requestedEndTime]
         ]);
 
-        // 5. The Collision Check: Does the available mask fully cover the requested mask?
         return ($availableMask & $requestedMask) === $requestedMask;
     }
 
@@ -239,23 +220,20 @@ class AppointmentController extends Controller
     {
         $patientId = Session::get('user_id');
 
-        // 1. Validate the correct input names
         $request->validate([
             'doctor_id'        => 'required|exists:users,id',
             'appointment_date' => 'required|date',
-            'start_time'       => 'required|date_format:H:i', // Alpine sends "09:00"
+            'start_time'       => 'required|date_format:H:i', 
             'reason'           => 'nullable|string',
             'appointment_type' => 'required|in:in_person,telemedicine',
         ]);
 
-        // 2. Fetch the specific doctor's rules
         $doctorProfile = DB::table('doctor_profiles')
             ->where('user_id', $request->doctor_id)
             ->first();
             
         $durationMinutes = $doctorProfile->slot_duration_minutes ?? 30;
 
-        // 3. SECURITY CHECK: Ensure it hasn't been taken in the last few seconds!
         $isAvailable = $this->isSlotAvailable(
             $request->doctor_id, 
             $request->appointment_date, 
@@ -269,16 +247,13 @@ class AppointmentController extends Controller
             ]);
         }
 
-        // 4. Calculate the true end time dynamically
         $startTs = strtotime($request->appointment_date . ' ' . $request->start_time);
         $endTs   = $startTs + ($durationMinutes * 60);
 
-        // (Optional) Calculate the mask if your DB schema requires it
         $slotMask = $this->calculateSlotMask([
             ['start' => $request->start_time, 'end' => date('H:i', $endTs)]
         ]);
 
-        // 5. Save it to the database
         DB::table('appointments')->insert([
             'patient_id'        => $patientId,
             'doctor_id'         => $request->doctor_id,
@@ -326,19 +301,16 @@ class AppointmentController extends Controller
         $current = \Carbon\Carbon::createFromTimeString('08:00:00');
         $end = \Carbon\Carbon::createFromTimeString('17:00:00');
 
-        // Step through the day in chunks based on the doctor's specific duration
         while ($current->copy()->addMinutes($durationMinutes)->lte($end)) {
             $startTime = $current->format('H:i');
             $endTime = $current->copy()->addMinutes($durationMinutes)->format('H:i');
 
-            // Generate what the mask WOULD be for this specific chunk
             $requestedMask = $this->calculateSlotMask([
                 ['start' => $startTime, 'end' => $endTime]
             ]);
 
-            // Collision Check: Does the available time completely cover this chunk?
             if (($availableMask & $requestedMask) === $requestedMask) {
-                $slots[] = $startTime; // It's free! Send it to the frontend.
+                $slots[] = $startTime;
             }
 
             $current->addMinutes($durationMinutes);

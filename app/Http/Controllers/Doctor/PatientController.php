@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class PatientController extends Controller
 {
@@ -15,17 +16,34 @@ class PatientController extends Controller
     {
         $doctorId = Session::get('user_id');
         $today    = now()->toDateString();
- 
-        return view('doctor.patients.index', [
-            'todayPatients'    => $this->fetchAppointmentRows($doctorId, 'today',    $today),
-            'upcomingPatients' => $this->fetchAppointmentRows($doctorId, 'upcoming', $today),
+        
+        Log::info('Doctor patients page loaded', [
+            'doctor_id' => $doctorId,
+            'today'     => $today,
         ]);
+
+        $todayPatients    = $this->fetchAppointmentRows($doctorId, 'today',    $today);
+        $upcomingPatients = $this->fetchAppointmentRows($doctorId, 'upcoming', $today);
+ 
+        Log::info('Patient lists fetched', [
+            'doctor_id'        => $doctorId,
+            'today_count'      => $todayPatients->count(),
+            'upcoming_count'   => $upcomingPatients->count(),
+        ]);
+ 
+        return view('doctor.patients.index', compact('todayPatients', 'upcomingPatients'));
     }
 
 
     public function updateEncounter(Request $request, string $uuid)
     {
         $doctorId = Session::get('user_id');
+
+        Log::info('Encounter update requested', [
+            'doctor_id'        => $doctorId,
+            'appointment_uuid' => $uuid
+        ]);
+
  
         $appointment = DB::table('appointments')
             ->where('uuid', $uuid)
@@ -33,6 +51,11 @@ class PatientController extends Controller
             ->first();
  
         if (!$appointment) {
+            Log::warning('Encounter update failed: appointment not found or unauthorized', [
+                'doctor_id'        => $doctorId,
+                'appointment_uuid' => $uuid,
+            ]);
+
             abort(404, 'Appointment not found.');
         }
  
@@ -62,7 +85,11 @@ class PatientController extends Controller
                     'updated_at' => now(),
                 ]);
 
-                // ── Upsert medical record ──
+                Log::info('Encounter: appointment marked completed', [
+                    'doctor_id'      => $doctorId,
+                    'appointment_id' => $appointment->id,
+                ]);
+
                 $vitalsJson = !empty($validated['vitals'])
                     ? json_encode(array_filter($validated['vitals'], fn($v) => $v !== '' && $v !== null))
                     : null;
@@ -82,6 +109,12 @@ class PatientController extends Controller
                             'updated_at'      => now(),
                         ]);
                     $recordId = $record->id;
+
+                    Log::info('Encounter: medical record updated', [
+                        'doctor_id' => $doctorId,
+                        'record_id' => $recordId,
+                    ]);
+
                 } else {
                     $recordId = DB::table('medical_records')->insertGetId([
                         'uuid'            => (string) Str::uuid(),
@@ -96,6 +129,13 @@ class PatientController extends Controller
                         'created_at'      => now(),
                         'updated_at'      => now(),
                     ]);
+
+                    Log::info('Encounter: medical record created', [
+                        'doctor_id'      => $doctorId,
+                        'record_id'      => $recordId,
+                        'appointment_id' => $appointment->id,
+                    ]);
+
                 }
  
                 // ── Replace prescriptions ──
@@ -104,6 +144,12 @@ class PatientController extends Controller
                     DB::table('prescriptions')
                         ->where('medical_record_id', $recordId)
                         ->delete();
+                    
+                    Log::info('Encounter: existing prescriptions deleted', [
+                        'doctor_id' => $doctorId,
+                        'record_id' => $recordId
+                    ]);
+
  
                     $rxRows = [];
                     foreach ($validated['prescriptions'] as $rx) {
@@ -128,9 +174,23 @@ class PatientController extends Controller
  
                     if (!empty($rxRows)) {
                         DB::table('prescriptions')->insert($rxRows);
+
+                        Log::info('Encounter: prescriptions inserted', [
+                            'doctor_id' => $doctorId,
+                            'record_id' => $recordId,
+                            'count'     => count($rxRows),
+                            'drugs'     => array_column($rxRows, 'drug_name'),
+                        ]);
+
                     }
                 }
             });
+
+            Log::info('Encounter update completed successfully', [
+                'doctor_id'        => $doctorId,
+                'appointment_uuid' => $uuid,
+            ]);
+
  
             return redirect()
                 ->route('doctor.patients.index')
@@ -147,6 +207,12 @@ class PatientController extends Controller
     public function confirmAppointment($id)
     {
         $doctorId = Session::get('user_id');
+
+        Log::info('Confirm appointment requested', [
+            'doctor_id'      => $doctorId,
+            'appointment_id' => $id,
+        ]);
+
  
         $appointment = DB::table('appointments')
             ->where('id', $id)
@@ -154,9 +220,19 @@ class PatientController extends Controller
             ->first();
  
         if (!$appointment) {
+            Log::warning('Confirm failed: appointment not found or unauthorized', [
+                'doctor_id'      => $doctorId,
+                'appointment_id' => $id,
+            ]);
             return back()->withErrors(['error' => 'Unauthorized or appointment not found.']);
         }
         if ($appointment->status !== 'pending') {
+            Log::warning('Confirm failed: appointment not in pending status', [
+                'doctor_id'      => $doctorId,
+                'appointment_id' => $id,
+                'status'         => $appointment->status,
+            ]);
+
             return back()->withErrors(['error' => 'Appointment cannot be confirmed.']);
         }
  
@@ -164,6 +240,12 @@ class PatientController extends Controller
             'status'     => 'confirmed',
             'updated_at' => now(),
         ]);
+
+        Log::info('Appointment confirmed successfully', [
+            'doctor_id'      => $doctorId,
+            'appointment_id' => $id,
+        ]);
+
  
         return redirect()->route('doctor.dashboard')->with('success', 'Appointment confirmed.');
     }
@@ -171,6 +253,11 @@ class PatientController extends Controller
     public function cancelAppointment($id)
     {
         $doctorId = Session::get('user_id');
+
+        Log::info('Cancel appointment requested', [
+            'doctor_id'      => $doctorId,
+            'appointment_id' => $id,
+        ]);
  
         $appointment = DB::table('appointments')
             ->where('id', $id)
@@ -178,9 +265,19 @@ class PatientController extends Controller
             ->first();
  
         if (!$appointment) {
+            Log::warning('Cancel failed: appointment not found or unauthorized', [
+                'doctor_id'      => $doctorId,
+                'appointment_id' => $id,
+            ]);
+
             return back()->withErrors(['error' => 'Unauthorized or appointment not found.']);
         }
         if (!in_array($appointment->status, ['pending', 'confirmed'])) {
+            Log::warning('Cancel failed: appointment not in cancellable status', [
+                'doctor_id'      => $doctorId,
+                'appointment_id' => $id,
+                'status'         => $appointment->status,
+            ]);
             return back()->withErrors(['error' => 'Cannot cancel this appointment.']);
         }
  
@@ -188,6 +285,12 @@ class PatientController extends Controller
             'status'     => 'cancelled',
             'updated_at' => now(),
         ]);
+
+        Log::info('Appointment cancelled successfully', [
+            'doctor_id'      => $doctorId,
+            'appointment_id' => $id,
+        ]);
+
  
         return redirect()->route('doctor.dashboard')->with('success', 'Appointment cancelled.');
     }

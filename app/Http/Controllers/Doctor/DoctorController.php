@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Log;
 
 class DoctorController extends Controller
 {
@@ -20,6 +21,13 @@ class DoctorController extends Controller
         $today = Carbon::today();
         $weekStart = $today->copy()->startOfWeek(Carbon::MONDAY);
         $weekEnd = $weekStart->copy()->addDays(6);
+
+        Log::info('Doctor dashboard loaded', [
+            'doctor_id'  => $userId,
+            'week_start' => $weekStart->toDateString(),
+            'week_end'   => $weekEnd->toDateString(),
+        ]);
+
 
         $weekDays = [];
         for ($i = 0; $i < 7; $i++) {
@@ -56,6 +64,12 @@ class DoctorController extends Controller
             ->orderBy('appointments.appointment_date')
             ->orderBy('appointments.start_time')
             ->get();
+
+        Log::info('Dashboard appointments fetched', [
+            'doctor_id' => $userId,
+            'count'     => $rawAppointments->count(),
+        ]);
+
 
         $dateToColumn = collect($weekDays)->pluck('column', 'date');
 
@@ -107,6 +121,8 @@ class DoctorController extends Controller
 
     public function showOnBoarding()
     {
+        $userId = Session::get('user_id');
+        Log::info('Doctor onboarding page loaded', ['doctor_id' => $userId]);
         $specialties     = DB::table('specialties')->orderBy('name')->get();
         $defaultDuration = 30;
  
@@ -120,7 +136,10 @@ class DoctorController extends Controller
 
     public function processOnBoarding(Request $request)
     {
+
         $userId    = Session::get('user_id');
+        
+        Log::info('Doctor onboarding submission received', ['doctor_id' => $userId]);
         $validated = $request->validate([
             'phone'                              => 'required|string|max:20',
             'gender'                             => 'required|in:male,female,other',
@@ -145,6 +164,9 @@ class DoctorController extends Controller
                     'gender'     => $validated['gender'],
                     'avatar_url' => $validated['avatar_url'] ?? null,
                 ]);
+
+                Log::info('Onboarding: users table updated', ['doctor_id' => $userId]);
+
  
                 $profileId = DB::table('doctor_profiles')->insertGetId([
                     'user_id'                => $userId,
@@ -155,6 +177,11 @@ class DoctorController extends Controller
                     'slot_duration_minutes'  => $validated['slot_duration_minutes'],
                     'created_at'             => now(),
                     'updated_at'             => now(),
+                ]);
+
+                Log::info('Onboarding: doctor_profile created', [
+                    'doctor_id'  => $userId,
+                    'profile_id' => $profileId,
                 ]);
  
                 $scheduleInserts = [];
@@ -167,8 +194,16 @@ class DoctorController extends Controller
                 }
  
                 DB::table('doctor_schedules')->insert($scheduleInserts);
+                Log::info('Onboarding: schedules inserted', [
+                    'doctor_id' => $userId,
+                    'days'      => array_column($validated['schedules'], 'weekday'),
+                ]);
+
+
                 Session::put('profile_id', $profileId);
             });
+            Log::info('Doctor onboarding completed successfully', ['doctor_id' => $userId]);
+
  
             return redirect()
                 ->route('doctor.dashboard')
@@ -204,6 +239,9 @@ class DoctorController extends Controller
     public function getProfile()
     {
         $userId = Session::get('user_id');
+
+        Log::info('Doctor profile page loaded', ['doctor_id' => $userId]);
+
     
         $profile = DB::table('users')
             ->where('users.id', $userId)
@@ -228,20 +266,21 @@ class DoctorController extends Controller
         $specialties     = DB::table('specialties')->orderBy('name')->get();
         $duration        = $profile->slot_duration_minutes ?? 30;
     
-        // Fetch existing schedule rows for this doctor
         $scheduleRows = DB::table('doctor_schedules')
             ->where('doctor_id', $userId)
             ->get()
-            ->keyBy('weekday');  // keyed by weekday int for easy lookup
-    
-        // Decode each day's slot_mask back into selectedStarts
-        // so Alpine can pre-populate the grid exactly as it was saved
+            ->keyBy('weekday');  
+
+        Log::info('Doctor schedule rows loaded', [
+            'doctor_id'   => $userId,
+            'weekday_ids' => $scheduleRows->keys()->toArray(),
+        ]);
+
         $existingSchedule = [];
         foreach ($scheduleRows as $weekday => $row) {
             $existingSchedule[$weekday] = $this->decodeMaskToStarts((int) $row->slot_mask, $duration);
         }
     
-        // Generate slots for the current duration to pass to the view
         $slots = $this->generateSlots($duration);
         $durations = $this->availableDurations();
     
@@ -255,13 +294,11 @@ class DoctorController extends Controller
         ));
     }
     
-    // ──────────────────────────────────────────────────────────────
-    //  updateProfile
-    // ──────────────────────────────────────────────────────────────
-    
     public function updateProfile(Request $request)
     {
         $userId    = Session::get('user_id');
+        Log::info('Doctor profile update submission received', ['doctor_id' => $userId,]);
+
         $validated = $request->validate([
             'name'                               => 'required|string|max:255',
             'phone'                              => 'required|string|max:20',
@@ -288,6 +325,8 @@ class DoctorController extends Controller
                     'avatar_url' => $validated['avatar_url'] ?? null,
                     'updated_at' => now(),
                 ]);
+                Log::info('Profile update: users table updated', ['doctor_id' => $userId]);
+
     
                 DB::table('doctor_profiles')->where('user_id', $userId)->update([
                     'specialty_id'          => $validated['specialty_id'],
@@ -296,9 +335,9 @@ class DoctorController extends Controller
                     'slot_duration_minutes' => $validated['slot_duration_minutes'],
                     'updated_at'            => now(),
                 ]);
-    
-                // Delete existing schedule rows and reinsert
-                // Simpler than diffing — schedule changes are infrequent
+                Log::info('Profile update: doctor_profiles updated', ['doctor_id' => $userId]);
+
+                // delete existing schedule rows and reinsert
                 DB::table('doctor_schedules')->where('doctor_id', $userId)->delete();
     
                 $scheduleInserts = [];
@@ -309,9 +348,17 @@ class DoctorController extends Controller
                         'slot_mask' => $this->calculateSlotMask($schedule['ranges']),
                     ];
                 }
-    
+                
                 DB::table('doctor_schedules')->insert($scheduleInserts);
+
+                Log::info('Profile update: schedules replaced', [
+                    'doctor_id' => $userId,
+                    'days'      => array_column($validated['schedules'], 'weekday'),
+                ]);
             });
+
+            Log::info('Doctor profile updated successfully', ['doctor_id' => $userId]);
+
     
             return redirect()->back()->with('success', 'Profile updated successfully.');
     
