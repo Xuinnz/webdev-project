@@ -56,6 +56,7 @@ CREATE TABLE doctor_profiles (
     license_number      VARCHAR(100) NULL,
     bio                 TEXT NULL,
     consultation_fee    DECIMAL(10, 2) NULL,
+    slot_duration_minutes TINYINT UNSIGNED NOT NULL DEFAULT 30;
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
