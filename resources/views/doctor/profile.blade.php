@@ -14,7 +14,7 @@
         @csrf
 
         {{-- ── Personal Information ── --}}
-        <div class="glass-panel glass-panel--padded mb-6 animate-unicare-scale-in stagger-2">
+        <div class="glass-panel glass-panel--padded animate-unicare-scale-in stagger-2" style="margin-bottom: 3rem;">
             <h2 class="section-title">Personal Information</h2>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -60,7 +60,7 @@
         </div>
 
         {{-- ── Professional Details ── --}}
-        <div class="glass-panel glass-panel--padded mb-6 animate-unicare-scale-in stagger-3">
+        <div class="glass-panel glass-panel--padded animate-unicare-scale-in stagger-3" style="margin-bottom: 3rem;">
             <h2 class="section-title">Professional Details</h2>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -120,21 +120,23 @@
         </div>
 
         {{-- ── Weekly Schedule ── --}}
-        <div class="glass-panel glass-panel--padded mb-6 animate-unicare-scale-in stagger-4">
+        <div class="glass-panel glass-panel--padded animate-unicare-scale-in stagger-4" style="margin-bottom: 3rem;">
             <h2 class="section-title mb-1">Weekly Schedule</h2>
             <p class="text-sm opacity-60 mb-5">Toggle days and select your available time slots.</p>
 
             @error('schedules')<p class="text-red-600 text-sm mb-3">{{ $message }}</p>@enderror
 
             {{-- Day toggles --}}
-            <div class="grid grid-cols-7 gap-2 mb-6">
+            <div class="grid grid-cols-7 mb-10" style="gap: 0.75rem; margin-bottom: 2.5rem;">
                 <template x-for="day in days" :key="day.weekday">
                     <button
                         type="button"
                         @click="toggleDay(day.weekday)"
                         :class="day.enabled
-                            ? 'unicare-btn-primary text-sm py-2 px-1 text-center'
-                            : 'unicare-btn-ghost text-sm py-2 px-1 text-center opacity-50'"
+                            ? 'unicare-btn-primary text-sm py-3 px-2 text-center'
+                            : 'unicare-btn-ghost text-sm py-3 px-2 text-center opacity-50'"
+                        class="w-full"
+                        style="margin: 0.125rem;"
                     >
                         <span x-text="day.short"></span>
                     </button>
@@ -143,18 +145,17 @@
 
             {{-- Slot grid per enabled day --}}
             <template x-for="day in days" :key="day.weekday">
-                <div x-show="day.enabled" x-transition class="mb-6">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="font-medium" x-text="day.label"></h3>
+                <div x-show="day.enabled" x-transition class="mb-10" style="margin-bottom: 3rem; border-bottom: 1px solid rgba(0, 0, 0, 0.08); padding-bottom: 2rem;">
+                    <div class="flex items-center justify-between" style="margin-bottom: 1.25rem;">
+                        <h3 class="font-medium text-lg" x-text="day.label"></h3>
                         <div class="flex gap-2">
                             <button type="button" @click="selectAll(day.weekday)"
-                                class="text-xs underline opacity-60 hover:opacity-100">Select all</button>
-                            <span class="opacity-30">·</span>
+                                class="unicare-btn-ghost text-xs py-1 px-3">Select all</button>
                             <button type="button" @click="clearAll(day.weekday)"
-                                class="text-xs underline opacity-60 hover:opacity-100">Clear</button>
+                                class="unicare-btn-ghost text-xs py-1 px-3">Clear</button>
                         </div>
                     </div>
-                    <div class="flex flex-wrap gap-2">
+                    <div class="flex flex-wrap" style="gap: 0.5rem 0.75rem;">
                         <template x-for="slot in visibleSlots" :key="slot.start">
                             <button
                                 type="button"
@@ -162,11 +163,12 @@
                                 :class="isSlotSelected(day.weekday, slot.start)
                                     ? 'schedule-slot schedule-slot--active'
                                     : 'schedule-slot'"
+                                style="margin-bottom: 0.5rem; margin-right: 0.25rem;"
                                 x-text="slot.label"
                             ></button>
                         </template>
                     </div>
-                    <p class="text-xs opacity-50 mt-2"
+                    <p class="text-xs opacity-50 mt-4"
                         x-text="selectedSlotCount(day.weekday) + ' slot(s) · ' + selectedHours(day.weekday) + ' hrs'">
                     </p>
                 </div>

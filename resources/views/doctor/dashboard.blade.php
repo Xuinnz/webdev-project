@@ -59,7 +59,7 @@
         >
             <div class="doctor-encounter-modal__backdrop" @click="close()"></div>
             <div class="doctor-encounter-modal__panel glass-panel glass-panel--padded" @click.stop style="max-width: 34rem;">
-                <button type="button" class="drawer-close" @click="close()" style="border: none; background: none; font-size: 1.75rem; color: var(--text-faint); cursor: pointer; position: absolute; top: 1rem; right: 1.25rem;">&times;</button>
+                <button type="button" class="doctor-encounter-modal__close" @click="close()">&times;</button>
                 
                 <div style="margin-bottom: 1.5rem;">
                     <h3 class="section-title" style="margin-bottom: 0.25rem; font-size: 1.5rem; color: var(--text-primary);" x-text="patient.name"></h3>
