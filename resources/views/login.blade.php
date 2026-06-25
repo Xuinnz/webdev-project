@@ -27,14 +27,31 @@
             height: 90%;
             width: auto;
             object-fit: contain;
-            margin-bottom: -10%;
-            margin-left: -10%;
+            margin-bottom: -5%;
+            margin-left: -5%;
             transform: scale(1.15);
             transform-origin: bottom left;
         }
 
         .login-panel {
-            flex: 2;
+            flex: 3;
+        }
+
+        .register-link {
+            text-align: center;
+            margin-top: 1rem;
+            font-size: 0.8125rem;
+            color: #6b7280;
+        }
+
+        .register-link a {
+            color: var(--color-primary, #2563eb);
+            text-decoration: none;
+            font-weight: 400;
+        }
+
+        .register-link a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -102,6 +119,10 @@
                     <button type="submit" class="login-submit">
                         Login
                     </button>
+
+                    <p class="register-link">
+                    Don't have an account yet? <a href="{{ route('auth.register.show') }}">Register</a>
+                    </p>
                 </form>
             </div>
         </main>

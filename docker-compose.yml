@@ -18,8 +18,7 @@ services:
     networks:
       - app-network
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     command: bash -c "chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache && chmod -R 775 /var/www/storage /var/www/bootstrap/cache && php-fpm"
 
 
@@ -57,10 +56,10 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
 
 networks:
   app-network:
