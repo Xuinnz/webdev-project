@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>@yield('title', 'UNICare') — The University Hospital</title>
+    <title>@yield('title', 'UNICare') — Admin Portal</title>
     <link rel="stylesheet" href="{{ asset('css/patient.css') }}">
     @vite(['resources/js/app.js'])
 </head>
@@ -17,16 +17,15 @@
                     </div>
                     <div>
                         <p class="unicare-brand-title">UNICare</p>
-                        <p class="unicare-brand-subtitle">The University Hospital</p>
+                        <p class="unicare-brand-subtitle">Admin Portal</p>
                     </div>
                 </div>
 
                 <nav class="unicare-nav">
                     @php
                         $links = [
-                            ['label' => 'Home', 'route' => 'doctor.dashboard'],
-                            ['label' => 'Patients', 'route' => 'doctor.patients.index'],
-                            ['label' => 'Profile', 'route' => 'doctor.profile'],
+                            ['label' => 'Users', 'route' => 'admin.users.index', 'active' => request()->routeIs('admin.users.*') || request()->routeIs('admin.dashboard')],
+                            ['label' => 'Roles', 'route' => 'admin.roles.index', 'active' => request()->routeIs('admin.roles.*')],
                         ];
                     @endphp
 
@@ -36,7 +35,7 @@
                             @click="navigate($event, '{{ route($link['route']) }}')"
                             @class([
                                 'unicare-nav-link animate-unicare-in',
-                                'is-active' => request()->routeIs($link['route']),
+                                'is-active' => $link['active'],
                                 'stagger-' . ($index + 2) => true,
                             ])
                         >
@@ -57,7 +56,7 @@
 
         <main class="unicare-main animate-unicare-in-right stagger-2">
             <div :class="leaving ? 'animate-unicare-out' : ''">
-                @include('doctor.common.flash')
+                @include('admin.common.flash')
                 @yield('content')
             </div>
         </main>

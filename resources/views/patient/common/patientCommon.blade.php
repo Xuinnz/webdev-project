@@ -6,6 +6,7 @@
     <title>@yield('title', 'UNICare') — The University Hospital</title>
     <link rel="stylesheet" href="{{ asset('css/patient.css') }}">
     @vite(['resources/js/app.js'])
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
 <body x-data="pageTransitions">
     <div class="unicare-shell" :class="leaving ? 'animate-unicare-out' : ''">
@@ -13,7 +14,7 @@
             <div>
                 <div class="unicare-brand animate-unicare-in stagger-1">
                     <div class="unicare-logo">
-                        <img src="{{ asset('images/unicare-logo.png') }}" alt="UNICare logo">
+                        <img src="{{ asset('images/unicare-logo-white.png') }}">
                     </div>
                     <div>
                         <p class="unicare-brand-title">UNICare</p>
@@ -24,9 +25,10 @@
                 <nav class="unicare-nav">
                     @php
                         $links = [
-                            ['label' => 'Home', 'route' => 'doctor.dashboard'],
-                            ['label' => 'Patients', 'route' => 'doctor.patients.index'],
-                            ['label' => 'Profile', 'route' => 'doctor.profile'],
+                            ['label' => 'Home', 'route' => 'patient.dashboard'],
+                            ['label' => 'Appointment', 'route' => 'patient.appointments'],
+                            ['label' => 'Medical Record', 'route' => 'patient.medical-records'],
+                            ['label' => 'Profile', 'route' => 'patient.profile'],
                         ];
                     @endphp
 
@@ -57,7 +59,6 @@
 
         <main class="unicare-main animate-unicare-in-right stagger-2">
             <div :class="leaving ? 'animate-unicare-out' : ''">
-                @include('doctor.common.flash')
                 @yield('content')
             </div>
         </main>

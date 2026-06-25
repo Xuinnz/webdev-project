@@ -4,11 +4,30 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
-{   
+{
+    public function showLoginForm()
+    {
+        if (Session::has('user_id')) {
+            $role = Session::get('user_role');
+            if ($role && Route::has($role . '.dashboard')) {
+                return redirect()->route($role . '.dashboard');
+            }
+        }
+
+        return view('login');
+    }
+
     //register (for both patient and doctor)
+
+    public function registerForm(){
+        return view('register');
+    }
     public function register(Request $request){
         $request->validate([
             'name' => 'required|string|max:255',
@@ -30,7 +49,7 @@ class AuthController extends Controller
             Session::put('user_name', $request->name);
 
             //redirect to specific role's onboarding
-            return redirect()->route($request->role . '.onboarding.show');
+            return redirect()->route($request->role === 'doctor' ? 'doctor.onboarding' : 'patient.onboarding');
 
         } catch (\Exception $e){
             return back()->withErrors(['error' => 'Registration failed. Please try again.'])->withInput();
@@ -55,21 +74,26 @@ class AuthController extends Controller
 
         if ($user->role === 'doctor') {
             $profile = DB::table('doctor_profiles')->where('user_id', $user->id)->first();
-            
+
             if ($profile) {
+                Session::put('profile_id', $profile->id);
                 return redirect()->route('doctor.dashboard');
-            } else {
-                return redirect()->route('doctor.onboarding');
             }
+
+            return redirect()->route('doctor.onboarding');
         }
+
         if ($user->role === 'patient') {
             $profile = DB::table('patient_profiles')->where('user_id', $user->id)->first();
-            
             if ($profile) {
+                Session::put('profile_id', $profile->id);
                 return redirect()->route('patient.dashboard');
-            } else {
-                return redirect()->route('patient.onboarding');
             }
+            return redirect()->route('patient.onboarding');
+        }
+
+        if ($user->role === 'admin') {
+            return redirect()->route('admin.dashboard');
         }
     }
 

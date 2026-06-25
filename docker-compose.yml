@@ -17,6 +17,11 @@ services:
       - ./:/var/www
     networks:
       - app-network
+    depends_on:
+      - db
+    command: bash -c "chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache && chmod -R 775 /var/www/storage /var/www/bootstrap/cache && php-fpm"
+
+
 
   # 2. The Nginx Web Server
   webserver:
@@ -45,10 +50,16 @@ services:
     environment:
       MYSQL_DATABASE: ${DB_DATABASE}
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_HOST: '%'
     volumes:
       - dbdata:/var/lib/mysql
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
 
 networks:
   app-network:
